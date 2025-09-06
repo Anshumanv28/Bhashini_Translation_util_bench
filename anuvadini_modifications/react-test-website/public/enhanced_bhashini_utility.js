@@ -37,21 +37,29 @@ const FILTER_PATTERNS = {
     iconTexts: [
         "home", "search", "settings", "menu", "info", "contact", "help",
         "logout", "login", "favorite", "add", "edit", "delete", "close",
-        "check", "clear", "done", "remove", "refresh", "download", "upload"
+        "check", "clear", "done", "remove", "refresh", "download", "upload",
+        "account_circle", "arrow_back", "arrow_forward", "chevron_left", 
+        "chevron_right", "expand_more", "expand_less", "keyboard_arrow_down",
+        "keyboard_arrow_up" // Added from anuvadini
     ],
     iconClasses: [
         "material-icons", "fa", "fas", "fab", "far", "fal", "mdi",
-        "icon", "glyphicon", "oi", "bi", "feather", "heroicon"
+        "icon", "glyphicon", "oi", "bi", "feather", "heroicon",
+        "msg-icon", "demo-inline-calendar-card", "angular-editor-textarea" // Added from anuvadini
     ],
     unwantedClasses: [
         "no-translate", "dont-translate", "bhashini-skip-translation",
-        "skip-translation", "mat-calendar", "ui-icon", "sprite"
+        "skip-translation", "mat-calendar", "ui-icon", "sprite",
+        "msg-icon", "demo-inline-calendar-card", "angular-editor-textarea",
+        "toggle-class" // Added from anuvadini
     ],
     unwantedTags: [
         "script", "style", "svg", "img", "noscript", "code", "pre",
         "kbd", "samp", "var", "math", "canvas", "video", "audio",
         "iframe", "embed", "object", "applet", "form", "input",
-        "textarea", "select", "button", "label", "fieldset", "legend"
+        "textarea", "select", "label", "fieldset", "legend",
+        "images" // Added from anuvadini
+        // Note: Removed "button" to allow button text translation
     ]
 };
 
@@ -366,6 +374,20 @@ class DFSTraversal {
                     }
                 }
                 
+                // Handle input button values (for buttons like "Sign Up", "Submit", etc.)
+                if (node.tagName === "INPUT" && node.type === "button" && node.hasAttribute("value")) {
+                    const value = node.getAttribute("value");
+                    if (!this.isIgnoredText(value, node, enableAdvancedFiltering)) {
+                        translatableContent.push({
+                            type: "value",
+                            node: node,
+                            content: value,
+                            depth: depth,
+                            path: this.generateNodePath(node)
+                        });
+                    }
+                }
+                
                 if (node.hasAttribute("alt")) {
                     const alt = node.getAttribute("alt");
                     if (!this.isIgnoredText(alt, node, enableAdvancedFiltering)) {
@@ -432,11 +454,16 @@ class DFSTraversal {
             result = true;
         } else if (REGEX_PATTERNS.numeric.test(text)) {
             result = true;
-        } else if (REGEX_PATTERNS.email.test(text)) {
+        } else if (REGEX_PATTERNS.email.test(text) || this.isValidGovtEmail(text)) {
             result = true;
         } else if (REGEX_PATTERNS.url.test(text)) {
             result = true;
         } else if (node.parentNode && this.isSkippableElement(node.parentNode, enableAdvancedFiltering)) {
+            result = true;
+        } else if (node.parentNode && (
+            node.parentNode.id === "persistent-toast-msg" ||
+            node.parentNode.id === "micButton"
+        )) {
             result = true;
         } else if (enableAdvancedFiltering) {
             // Advanced filtering
@@ -454,6 +481,12 @@ class DFSTraversal {
         
         this.ignoredNodeCache.set(node, result);
         return result;
+    }
+    
+    isValidGovtEmail(email) {
+        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/;
+        let normalizedEmail = email.replace(/\[dot\]/g, ".").replace(/\[at\]/g, "@");
+        return emailRegex.test(normalizedEmail);
     }
     
     isIgnoredText(text, node, enableAdvancedFiltering) {
@@ -889,6 +922,9 @@ class BatchProcessor {
                     break;
                 case "title":
                     node.node.setAttribute("title", translatedText);
+                    break;
+                case "value":
+                    node.node.setAttribute("value", translatedText);
                     break;
                 case "alt":
                     node.node.setAttribute("alt", translatedText);
@@ -2023,6 +2059,8 @@ class TranslationEngine {
                 return node.placeholder || node.getAttribute('placeholder') || '';
             case "title":
                 return node.title || node.getAttribute('title') || '';
+            case "value":
+                return node.value || node.getAttribute('value') || '';
             case "alt":
                 return node.alt || node.getAttribute('alt') || '';
             default:
@@ -2075,6 +2113,8 @@ class TranslationEngine {
                         return node;
                     } else if (nodeData.type === 'title' && node.title === nodeData.content) {
                         return node;
+                    } else if (nodeData.type === 'value' && node.value === nodeData.content) {
+                        return node;
                     } else if (nodeData.type === 'alt' && node.alt === nodeData.content) {
                         return node;
                     }
@@ -2099,6 +2139,9 @@ class TranslationEngine {
                     break;
                 case "title":
                     node.node.setAttribute("title", translatedText);
+                    break;
+                case "value":
+                    node.node.setAttribute("value", translatedText);
                     break;
                 case "alt":
                     node.node.setAttribute("alt", translatedText);

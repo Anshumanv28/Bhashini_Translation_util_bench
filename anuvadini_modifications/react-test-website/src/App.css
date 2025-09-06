@@ -1,0 +1,173 @@
+.App {
+  text-align: left;
+  min-height: 100vh;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* React-specific enhancements */
+.react-component {
+  transition: all 0.3s ease;
+}
+
+.react-component:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Dynamic content animations */
+.content-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading states */
+.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* React state transitions */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Responsive React grid */
+.react-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+
+/* React component states */
+.component-active {
+  border-left: 4px solid #4facfe;
+}
+
+.component-inactive {
+  border-left: 4px solid #f5576c;
+}
+
+.component-processing {
+  border-left: 4px solid #fee140;
+}
+
+/* Benchmark Results Styles */
+.benchmark-results {
+  margin: 20px 0;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+}
+
+.benchmark-results h4 {
+  margin: 0 0 20px 0;
+  text-align: center;
+  font-size: 1.2em;
+  color: white;
+}
+
+.benchmark-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.benchmark-card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.benchmark-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.benchmark-title {
+  font-size: 0.9em;
+  font-weight: bold;
+  margin-bottom: 10px;
+  opacity: 0.9;
+}
+
+.benchmark-value {
+  font-size: 2em;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.benchmark-label {
+  font-size: 0.8em;
+  opacity: 0.8;
+}
+
+.benchmark-card.original {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+}
+
+.benchmark-card.enhanced {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.benchmark-card.improvement {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.benchmark-card.improvement .benchmark-value {
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}

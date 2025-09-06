@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="React website for testing the enhanced Bhashini utility with DFS caching and Anuvadini features"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Enhanced Bhashini Utility - React Test Website</title>
+    
+    <!-- Preload Enhanced Bhashini utility script only -->
+    <link rel="preload" href="enhanced_bhashini_utility.js" as="script">
+
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    
+    <!-- Enhanced Bhashini Utility Script Only -->
+    <script src="enhanced_bhashini_utility.js"></script>
+    <!-- Note: enhanced_bhashini_utility.js is self-contained with direct API calls -->
+
+  </body>
+</html>

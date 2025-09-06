@@ -1,66 +1,39 @@
+// TEMPORARILY DISABLED: Original Bhashini overlay components
+// The following components have been commented out:
+// - Main overlay button and dropdown
+// - Feedback modal and star rating system
+// - Overlay positioning and resize handlers
+// - Language dropdown population
+// 
+// This allows testing of the enhanced utility without interference
+// To re-enable, uncomment the sections marked with "TEMPORARILY DISABLED"
+
 var currentScript = document.currentScript;
-// var TRANSLATION_PLUGIN_API_KEY = currentScript.getAttribute('secretKey');
-// var posX = currentScript.getAttribute("data-pos-x") || 100;
-// var posY = currentScript.getAttribute("data-pos-y") || 5;
-var defaultTranslatedLanguage = currentScript.getAttribute(
+// const TRANSLATION_PLUGIN_API_KEY = currentScript.getAttribute('secretKey');
+const posX = currentScript.getAttribute("data-pos-x") || 100;
+const posY = currentScript.getAttribute("data-pos-y") || 5;
+let defaultTranslatedLanguage = currentScript.getAttribute(
   "default-translated-language"
 );
-var languageListAttribute = currentScript.getAttribute(
+const languageListAttribute = currentScript.getAttribute(
   "translation-language-list"
 );
 
 var initialPreferredLanguage = currentScript.getAttribute(
   "initial_preferred_language"
 );
+const pageSourceLanguage =
+  currentScript.getAttribute("page-source-language") || "en";
+// const TRANSLATION_PLUGIN_API_BASE_URL = new URL(
+//   currentScript.getAttribute("src")
+// ).origin;
 
-/**
- * --------------------------------------------------------------------------
- * Language Ordering Configuration
- *
- * This section reads the `language_order` attribute from the <script> tag
- * used to include the plugin on the host website.
- *
- * Example usage in HTML or React:
- *   <script src="./translation_with_feedback_url.js" language_order="en,hi,ta"></script>
- *
- * The attribute `language_order` defines the preferred display order of languages
- * in the language dropdown menu. If not provided, languages will appear in their
- * default order.
- *
- * The value should be a comma-separated list of language codes:
- *   e.g., "en,hi,mr" → English, Hindi, Marathi shown at the top.
- *
- * Logic:
- *   - `orderLanguageArr` stores the ordered list of language codes.
- *   - The `getOrderedLanguages()` function (later in this file) reorders
- *     the global `supportedTargetLangArr` accordingly.
- *
- * Dependencies:
- *   - Uses `supportedTargetLangArr` to reorder UI display.
- *   - Applied before rendering dropdown in `fetchTranslationSupportedLanguages()`.
- * --------------------------------------------------------------------------
- */
-// ------------------------------------------------------------------------------------------------------------------
-var orderLanguageAttribute = currentScript.getAttribute("language_order");
-var orderLanguageArr = [];
-if (orderLanguageAttribute) {
-  orderLanguageArr = orderLanguageAttribute
-    .split(",")
-    .map((lang) => lang.trim());
-}
-// ------------------------------------------------------------------------------------------------------------------
-
-var TRANSLATION_PLUGIN_API_BASE_URL = new URL(currentScript.getAttribute("src"))
-  .origin;
-var languageIconColor =
-  currentScript.getAttribute("language-icon-color") || "#1D0A69";
-
-// var TRANSLATION_PLUGIN_API_BASE_URL = "https://translation-plugin.bhashini.co.in/"
-var mixedCode = currentScript.getAttribute("mixed-code") || false;
-var languageDetection =
+const languageDetection =
   currentScript.getAttribute("language-detection") || false;
-var pageSourceLanguage = currentScript.getAttribute("page-source-language");
-var supportedTargetLangArr = [
+const TRANSLATION_PLUGIN_API_BASE_URL =
+  "https://translation-plugin.bhashini.co.in";
+let mixedCode = currentScript.getAttribute("mixed-code") || false;
+const supportedTargetLangArr = [
   { code: "en", label: "English" },
   { code: "as", label: "Assamese (অসমীয়া)" },
   { code: "bn", label: "Bengali (বাংলা)" },
@@ -70,7 +43,7 @@ var supportedTargetLangArr = [
   { code: "gu", label: "Gujarati (ગુજરાતી)" },
   { code: "hi", label: "Hindi (हिन्दी)" },
   { code: "kn", label: "Kannada (ಕನ್ನಡ)" },
-  { code: "ks", label: "Kashmiri (कश्मीरी)" },
+  { code: "ks", label: "Kashmiri (کٲشُر)" },
   { code: "mai", label: "Maithili (मैथिली)" },
   { code: "ml", label: "Malayalam (മലയാളം)" },
   { code: "mni", label: "Manipuri (মণিপুরী)" },
@@ -86,74 +59,7 @@ var supportedTargetLangArr = [
   { code: "ur", label: "Urdu (اردو)" },
 ];
 
-/**
- * --------------------------------------------------------------------------
- * Function: getOrderedLanguages(languageArray)
- *
- * Description:
- * Reorders the provided array of language objects (`languageArray`) based on
- * a preferred language code sequence defined in the global variable `orderLanguageArr`.
- *
- * This function ensures that preferred languages appear first in the dropdown,
- * while maintaining the order of all remaining languages afterward.
- *
- * Input:
- * - languageArray: Array of language objects with shape { code: string, label: string }
- *   Example:
- *     [
- *       { code: "hi", label: "Hindi" },
- *       { code: "en", label: "English" },
- *       ...
- *     ]
- *
- * Global Dependency:
- * - orderLanguageArr (e.g., ['en', 'hi', 'ta']) which is populated from the
- *   <script order_language="en,hi,ta"> tag attribute earlier in the script.
- *
- * Logic:
- * - Step 1: Create a shallow copy of the input array (`remainingLanguages`).
- * - Step 2: Loop through each code in `orderLanguageArr`:
- *     → If found in `remainingLanguages`, move it to `orderedLanguages`.
- *     → Remove it from `remainingLanguages` to prevent duplication.
- * - Step 3: Append the rest of the `remainingLanguages` to `orderedLanguages`.
- * - Step 4: Return the reordered array.
- *
- * Usage:
- * - Applied to `supportedTargetLangArr` before rendering the UI dropdown.
- *
- * Returns:
- * - A reordered array of languages.
- * --------------------------------------------------------------------------
- */
-function getOrderedLanguages(languageArray) {
-  if (orderLanguageArr.length === 0) {
-    return languageArray;
-  }
-
-  const orderedLanguages = [];
-  const remainingLanguages = [...languageArray];
-
-  // First, add languages in the specified order
-  orderLanguageArr.forEach((code) => {
-    const foundIndex = remainingLanguages.findIndex(
-      (lang) => lang.code === code
-    );
-    if (foundIndex !== -1) {
-      orderedLanguages.push(remainingLanguages[foundIndex]);
-      remainingLanguages.splice(foundIndex, 1);
-    }
-  });
-
-  // Then add remaining languages
-  orderedLanguages.push(...remainingLanguages);
-
-  return orderedLanguages;
-}
-
-supportedTargetLangArr = getOrderedLanguages(supportedTargetLangArr);
-// ------------------------------------------------------------------------------------------------------------------
-
-var CHUNK_SIZE = 25;
+const CHUNK_SIZE = 25;
 
 // Define translationCache object to store original text
 var translationCache = {};
@@ -162,7 +68,7 @@ var translationCache = {};
 var isContentTranslated = false;
 
 // Selected target language for translation
-var selectedTargetLanguageCode =
+let selectedTargetLanguageCode =
   localStorage.getItem("preferredLanguage") || initialPreferredLanguage;
 
 // Retrieve translationCache from session storage if available
@@ -172,15 +78,15 @@ if (sessionStorage.getItem("translationCache")) {
 
 var cssLink = document.createElement("link");
 cssLink.rel = "stylesheet";
-cssLink.href = `${TRANSLATION_PLUGIN_API_BASE_URL}/v3/website_translation_utility.css`;
+cssLink.href = `${TRANSLATION_PLUGIN_API_BASE_URL}/v2/website_translation_utility.css`;
 // cssLink.href = `./plugin.css`;
 
 // Append link to the head
 document.head.appendChild(cssLink);
 
-var selectedRating = 0;
+let selectedRating = 0;
 
-var getPoweredByText = (lang) => {
+const getPoweredByText = (lang) => {
   switch (lang) {
     case "kn":
       return "ಮೂಲಕ ನಡೆಸಲ್ಪಡುತ್ತಿದೆ";
@@ -192,130 +98,50 @@ var getPoweredByText = (lang) => {
 };
 
 function toggleDropdown() {
-  var dropdown = document.getElementById("bhashiniLanguageDropdown");
+  const dropdown = document.getElementById("bhashiniLanguageDropdown");
   dropdown.style.display =
     dropdown.style.display === "block" ? "none" : "block";
-
-  // Get measurements after showing the dropdown
-  var dropdownHeight = dropdown.clientHeight;
-  var dropdownWidth = dropdown.clientWidth;
-  var windowHeight = window.innerHeight;
-  var windowWidth = window.innerWidth;
-  var dropdownRect = dropdown.getBoundingClientRect();
-
-  // Handle vertical positioning
-  var spaceBelow = windowHeight - dropdownRect.top;
-  var spaceAbove = dropdownRect.top;
-
-  if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+  const dropdownHeight = dropdown.clientHeight;
+  const windowHeight = window.innerHeight;
+  const dropdownTop = dropdown.getBoundingClientRect().top;
+  if (windowHeight - dropdownTop < dropdownHeight) {
     dropdown.style.bottom = "100%";
     dropdown.style.top = "auto";
   } else {
     dropdown.style.top = "100%";
     dropdown.style.bottom = "auto";
   }
-
-  // Handle horizontal positioning - check both left and right space
-  var spaceRight = windowWidth - dropdownRect.left;
-  var spaceLeft = dropdownRect.right;
-
-  if (spaceRight < dropdownWidth && spaceLeft > spaceRight) {
-    // Not enough space on right, and left has more space
-    dropdown.style.right = "0";
-    dropdown.style.left = "auto";
-  } else {
-    // Enough space on right, or right has more space than left
-    dropdown.style.left = "0";
-    dropdown.style.right = "auto";
-  }
 }
-
-/**
- * -----------------------------------------------------------------------------
- * Function: fetchTranslationSupportedLanguages
- *
- * Purpose:
- * Initializes and renders the Bhashini language translation dropdown UI. It
- * appends available languages to a target element in the DOM and sets up
- * branding and feedback options. It respects language ordering and filtering
- * attributes defined in the script tag.
- *
- * Script Attributes Supported:
- * - `order_language`: Comma-separated language codes that determine the display order.
- * - `translation-language-list`: Comma-separated language codes that filter which languages appear.
- *
- * Main Responsibilities:
- * 1. Prevents duplicate rendering by using a global guard flag (`__bhashiniLanguagesRendered`).
- * 2. Retrieves the target dropdown container by ID `bhashiniLanguageDropdown`.
- * 3. Clears any existing language options before rendering new ones.
- * 4. Filters and/or reorders the language list based on script tag attributes.
- * 5. Dynamically creates and appends each language option as a `div` with
- *    accessibility features (`tabindex`, `role`, etc.).
- * 6. Appends branding elements such as the Bhashini logo, "Powered by" text,
- *    and a feedback button.
- * 7. Sets up keyboard and click event listeners for selecting languages.
- *
- * Example Usage:
- * <script
- *   src="translation_with_feedback_url.js"
- *   order_language="en,hi,ta"
- *   translation-language-list="en,hi,ta,bn"
- *   language-icon="true"
- * ></script>
- *
- * Global Dependencies:
- * - `supportedTargetLangArr`: Array of language objects `{ code, label }`
- * - `selectedTargetLanguageCode`: Language code for current selection
- * - `languageListAttribute`: Retrieved via `getAttribute()` from script tag
- * - `TRANSLATION_PLUGIN_API_BASE_URL`: Host URL for assets (logo, icons)
- * - `selectLanguage()`: Function to activate selected language on click
- *
- * Accessibility:
- * - Pressing `Enter` on a focused option triggers translation.
- * - All options use semantic ARIA roles (`button`) and keyboard tab support.
- *
- * Notes:
- * - This function should only run once. Re-execution is blocked using a
- *   window-level flag (`window.__bhashiniLanguagesRendered = true`).
- * - Ensures safe DOM manipulation by checking element presence before use.
- * -----------------------------------------------------------------------------
- */
 
 // Fetch supported translation languages
 function fetchTranslationSupportedLanguages() {
-  // false check commenting to test
-  // if (window.__bhashiniLanguagesRendered) return;
-  // window.__bhashiniLanguagesRendered = true;
-
-  var targetLangSelectElement = document.getElementById(
+  const targetLangSelectElement = document.getElementById(
     "bhashiniLanguageDropdown"
   );
-  var brandingDiv = document.createElement("div");
+  const brandingDiv = document.createElement("div");
   brandingDiv.setAttribute("class", "bhashini-branding");
-  var poweredBy = document.createElement("span");
+  const poweredBy = document.createElement("span");
   poweredBy.textContent = getPoweredByText(selectedTargetLanguageCode);
-  var bhashiniLogo = document.createElement("img");
-  bhashiniLogo.src = `${TRANSLATION_PLUGIN_API_BASE_URL}/v3/bhashini-logo.png`;
+  const bhashiniLogo = document.createElement("img");
+  bhashiniLogo.src = `${TRANSLATION_PLUGIN_API_BASE_URL}/v2/bhashini-logo.png`;
   bhashiniLogo.alt = "Bhashini Logo";
 
   // feedback button
   // if (selectedTargetLanguageCode !== "en") {
-  var feedbackDiv = document.createElement("div");
+  const feedbackDiv = document.createElement("div");
   feedbackDiv.setAttribute("class", "bhashini-feedback-div");
   feedbackDiv.setAttribute("title", "Feedback");
   // feedbackButton.innerHTML = `<img src=${TRANSLATION_PLUGIN_API_BASE_URL}/v2/feedback.svg alt="feedback">`;
-  var feedbackButton = document.createElement("button");
+  const feedbackButton = document.createElement("button");
   feedbackButton.setAttribute("class", "bhashini-feedback-button ");
   feedbackButton.setAttribute("title", "Feedback");
   feedbackButton.addEventListener("click", function () {
-    var feedbackModal = document.querySelector(".bhashini-feedback-modal");
+    const feedbackModal = document.querySelector(".bhashini-feedback-modal");
     feedbackModal.style.display = "block";
-
-    // document.getElementById("current-page-url").textContent =
-    // window.location.href; // This single line updates the URL
   });
-  feedbackButton.innerHTML = `<img src=${TRANSLATION_PLUGIN_API_BASE_URL}/v3/feedback.svg alt="feedback">`;
+  feedbackButton.innerHTML = `<img src=${TRANSLATION_PLUGIN_API_BASE_URL}/v2/feedback.svg alt="feedback">`;
   // feedbackButton.innerHTML = `<img src= feedback.svg alt="feedback">`;
+
   feedbackDiv.appendChild(feedbackButton);
   brandingDiv.appendChild(feedbackDiv);
 
@@ -324,143 +150,105 @@ function fetchTranslationSupportedLanguages() {
   brandingDiv.appendChild(poweredBy);
   brandingDiv.appendChild(bhashiniLogo);
 
-  /**
-   * --------------------------------------------------------------------------
-   * Language Display Filter and Ordering Logic
-   *
-   * Description:
-   * Determines the final list of languages (`languagesToShow`) to be displayed
-   * in the translation dropdown. This process respects both the `order_language`
-   * and `translation-language-list` attributes set in the <script> tag.
-   *
-   * Workflow:
-   * 1. By default, `languagesToShow` is initialized with the full list:
-   *      → `supportedTargetLangArr` (which may already be reordered).
-   *
-   * 2. If `translation-language-list` attribute is provided in the script tag:
-   *      → The list is filtered to include only the specified languages.
-   *      → e.g., <script translation-language-list="en,hi,ta">
-   *
-   * 3. For each language in the filtered or full list:
-   *      → Create a clickable div element with accessibility roles and data attributes.
-   *      → Set the first item as `selected` (default language).
-   *      → Append all language options to the dropdown container.
-   *
-   * 4. Accessibility Support:
-   *      → Adds keyboard support for language selection via `Enter` key.
-   *
-   * Example:
-   * <script
-   *   src="translation_with_feedback_url.js"
-   *   order_language="en,hi,ta"
-   *   translation-language-list="en,hi,ta,bn,ml"
-   * ></script>
-   *
-   * This will:
-   *   - Filter dropdown to only English, Hindi, Tamil, Bengali, Malayalam.
-   *   - Reorder those so English, Hindi, Tamil appear first.
-   *
-   * Dependencies:
-   *   - `supportedTargetLangArr` (may already be reordered).
-   *   - `languageListAttribute` (optional, filters final list).
-   * --------------------------------------------------------------------------
-   */
-  let languagesToShow = supportedTargetLangArr;
-
-  // Step 1: Filter languages if `translation-language-list` attribute is present
   if (languageListAttribute) {
+    // If the languageList attribute is present
+    // remove extra spaces and split the string into an array
+    // so if the attribute is "en, hi, ta", it will be converted to ["en", "hi", "ta"]
     const languageList = languageListAttribute
       .split(",")
       .map((lang) => lang.trim());
-    languagesToShow = supportedTargetLangArr.filter((lang) =>
+    const filteredLanguages = supportedTargetLangArr.filter((lang) =>
       languageList.includes(lang.code)
     );
-  }
-
-  // Step 2: Render dropdown options (once, cleanly)
-  targetLangSelectElement.innerHTML = ""; // clear before rendering
-  languagesToShow.forEach((element, index) => {
-    const option_element = document.createElement("div");
+    // Loop through the filtered languages and create of ption elements for the dropdown
+    filteredLanguages.forEach((element, index) => {
+      let option_element = document.createElement("div");
     option_element.setAttribute("class", "dont-translate language-option");
     option_element.setAttribute("data-value", element.code);
-    option_element.setAttribute("tabindex", "0");
-    option_element.setAttribute("role", "button");
     option_element.textContent = element.label;
-
+      // Set the first language as the default selected option
     if (index === 0) {
       option_element.setAttribute("selected", "selected");
     }
     targetLangSelectElement.appendChild(option_element);
   });
-
-  // console.log("targetLangSelectElement: ", targetLangSelectElement);
-
-  // Step 3: Accessibility – keyboard support
-  targetLangSelectElement.addEventListener("keydown", function (event) {
-    const languageOption = event.target.closest(".language-option");
-    if (languageOption && event.key === "Enter") {
-      event.preventDefault();
-      selectLanguage(languageOption.textContent);
-    }
-  });
-
-  // ------------------------------------------------------------------------------------------------------------------
+  } else {
+    supportedTargetLangArr.forEach((element) => {
+      let option_element = document.createElement("div");
+      option_element.setAttribute("class", "dont-translate language-option");
+      option_element.setAttribute("data-value", element.code);
+      option_element.textContent = element.label;
+      targetLangSelectElement.appendChild(option_element);
+    });
+  }
   targetLangSelectElement.appendChild(brandingDiv);
 
   // Add single event listener to parent container using event delegation
-  // targetLangSelectElement.addEventListener("click", function (event) {
-  //   var languageOption = event.target.closest(".language-option");
-  //   if (languageOption) {
-  //     selectLanguage(languageOption.textContent);
-  //   }
-  // });
-  // Accessibility
-  targetLangSelectElement.addEventListener(
-    "keydown",
-    function (event) {
-      const languageOption = event.target.closest(".language-option");
-      if (languageOption && event.key === "Enter") {
-        event.preventDefault();
-        selectLanguage(languageOption.textContent);
-      }
-    },
-    { once: true }
-  );
-
-  targetLangSelectElement.addEventListener(
-    "click",
-    function (event) {
+  targetLangSelectElement.addEventListener("click", function (event) {
       const languageOption = event.target.closest(".language-option");
       if (languageOption) {
         selectLanguage(languageOption.textContent);
       }
-    },
-    { once: true }
-  );
+  });
 }
 
 // Function to split an array into chunks of a specific size
 function chunkArray(array, size) {
-  var chunkedArray = [];
-  for (var i = 0; i < array.length; i += size) {
+  const chunkedArray = [];
+  for (let i = 0; i < array.length; i += size) {
     chunkedArray.push(array.slice(i, i + size));
   }
   return chunkedArray;
 }
 
 // Function to get all input and textArea element with placeholders
+function getInputElementsWithPlaceholders() {
+  return Array.from(
+    document.querySelectorAll("input[placeholder], textarea[placeholder]")
+  );
+}
+
+async function translateTitleAttributes(element, target_lang) {
+  const elementsWithTitle = element.querySelectorAll("[title]");
+  const titleTexts = Array.from(elementsWithTitle).map((el) =>
+    el.getAttribute("title")
+  );
+
+  if (titleTexts.length > 0) {
+    const translatedTitles = await translateTextChunks(titleTexts, target_lang);
+    elementsWithTitle.forEach((el, index) => {
+      const translatedTitle =
+        translatedTitles[index].target || titleTexts[index];
+      el.setAttribute("title", translatedTitle);
+    });
+  }
+}
+
+// Function to translate all input elements with placeholders
+async function translatePlaceholders(target_lang) {
+  const inputs = getInputElementsWithPlaceholders();
+  const placeholders = inputs.map((input) => input.placeholder);
+
+  if (placeholders.length > 0) {
+    const translatedPlaceholders = await translateTextChunks(
+      placeholders,
+      target_lang
+    );
+
+    inputs.forEach((input, index) => {
+      const translatedPlaceholder =
+        translatedPlaceholders[index].target || placeholders[index];
+      input.placeholder = translatedPlaceholder;
+    });
+  }
+}
 
 // Function to translate text chunks using custom API
 async function translateTextChunks(chunks, target_lang) {
-  if (pageSourceLanguage && pageSourceLanguage === target_lang) {
-    // If the target language is the same as the page source language, return the original chunks
+  if (target_lang === "en") {
     return chunks.map((chunk) => ({ source: chunk, target: chunk }));
   }
-
-  // if (target_lang === "en") {
-  //   return chunks.map((chunk) => ({ source: chunk, target: chunk }));
-  // }
-  var payload = {
+  const payload = {
     targetLanguage: target_lang,
     textData: chunks,
   };
@@ -468,13 +256,15 @@ async function translateTextChunks(chunks, target_lang) {
   if (mixedCode === "true") {
     payload.mixed_code = true;
   }
+
   if (languageDetection === "true") {
     payload.languageDetection = true;
   } else {
-    payload.sourceLanguage = pageSourceLanguage || "en";
+    payload.sourceLanguage = "en";
   }
+
   try {
-    var response = await fetch(
+    const response = await fetch(
       `${TRANSLATION_PLUGIN_API_BASE_URL}/v2/translate-text`,
       {
         method: "POST",
@@ -485,72 +275,13 @@ async function translateTextChunks(chunks, target_lang) {
         body: JSON.stringify(payload),
       }
     );
-    var data = await response.json();
+    const data = await response.json();
     return data;
   } catch (error) {
     console.error("Error translating text:", error);
     return [];
   }
 }
-
-// Function to recursively traverse DOM tree and get text nodes while skipping elements with "dont-translate" class
-// function getTextNodesToTranslate(rootNode) {
-//   var translatableContent = [];
-
-//   function isSkippableElement(node) {
-//     return (
-//       node.nodeType === Node.ELEMENT_NODE &&
-//       (node.classList.contains("dont-translate") ||
-//         node.classList.contains("bhashini-skip-translation") ||
-//         node.tagName === "SCRIPT" ||
-//         node.tagName === "STYLE" ||
-//         node.tagName === "NOSCRIPT")
-//     );
-//   }
-
-//   function traverseNode(node) {
-//     // Skip the entire subtree if this is a skippable element
-//     if (isSkippableElement(node)) {
-//       return;
-//     }
-
-//     // Process this node
-//     if (node.nodeType === Node.TEXT_NODE) {
-//       var text = node.textContent;
-//       var isNumeric = /^[\d.]+$/.test(text);
-//       if (text && !isIgnoredNode(node) && !isNumeric) {
-//         translatableContent.push({
-//           type: "text",
-//           node: node,
-//           content: text,
-//         });
-//       }
-//     } else if (node.nodeType === Node.ELEMENT_NODE) {
-//       if (node.hasAttribute("placeholder")) {
-//         translatableContent.push({
-//           type: "placeholder",
-//           node: node,
-//           content: node.getAttribute("placeholder"),
-//         });
-//       }
-//       if (node.hasAttribute("title")) {
-//         translatableContent.push({
-//           type: "title",
-//           node: node,
-//           content: node.getAttribute("title"),
-//         });
-//       }
-
-//       // Process all child nodes
-//       for (let i = 0; i < node.childNodes.length; i++) {
-//         traverseNode(node.childNodes[i]);
-//       }
-//     }
-//   }
-
-//   traverseNode(rootNode);
-//   return translatableContent;
-// }
 
 // Function to recursively traverse DOM tree and get text nodes while skipping elements with "dont-translate" class
 function getTextNodesToTranslate(rootNode) {
@@ -599,7 +330,6 @@ function getTextNodesToTranslate(rootNode) {
 
     // Check for valid DOM node
     if (!node || !node.nodeType) {
-      console.log(`Invalid node received: ${node}`);
       return;
     }
 
@@ -642,17 +372,17 @@ function getTextNodesToTranslate(rootNode) {
     }
   }
 
-  // console.log("Starting traversal of root node:", rootNode);
   traverseNode(rootNode);
   return translatableContent;
 }
+
 function isIgnoredNode(node) {
-  var emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/;
-  var isValidGovtEmail = (email) => {
-    var normalizedEmail = email.replace(/\[dot]/g, ".").replace(/\[at]/g, "@");
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/;
+  const nonEnglishRegex = /^[^A-Za-z0-9]+$/;
+  const isValidGovtEmail = (email) => {
+    let normalizedEmail = email.replace(/\[dot]/g, ".").replace(/\[at]/g, "@");
     return emailRegex.test(normalizedEmail);
   };
-  var nonEnglishRegex = /^[^A-Za-z0-9]+$/;
   var onlyNewLinesOrWhiteSpaceRegex = /^[\n\s\r\t]*$/;
   return (
     (node.parentNode &&
@@ -670,10 +400,58 @@ function isIgnoredNode(node) {
   );
 }
 
+// Global instance
+
+async function translateElementText(element, target_lang) {
+  const promises = [];
+  const textNodes = getTextNodesToTranslate(element);
+
+  if (textNodes.length > 0) {
+    const textContentArray = textNodes.map((node, index) => {
+      const id = `translation-${Date.now()}-${index}`;
+      // Store original text in session storage
+      if (node.parentNode) {
+        node.parentNode.setAttribute("data-translation-id", id);
+      }
+      return { text: node.content, id, node };
+    });
+
+    const textChunks = chunkArray(textContentArray, CHUNK_SIZE);
+
+    // Create an array to hold promises for each chunk translation
+    const textNodePromises = textChunks.map(async (chunk) => {
+      const texts = chunk.map(({ text }) => text);
+      // if (target_lang === "en") {
+      //         return;
+      // }
+      const translatedTexts = await translateTextChunks(texts, target_lang);
+      chunk.forEach(({ node }, index) => {
+        const translatedText = translatedTexts[index].target || texts[index];
+
+        if (node.type === "text") {
+          node.node.nodeValue = translatedText;
+        }
+        if (node.type === "value") {
+          node.node.value = translatedText;
+        }
+        if (node.type === "placeholder") {
+          node.node.placeholder = translatedText;
+        }
+        if (node.type === "title") {
+          node.node.setAttribute("title", translatedText);
+        }
+      });
+    });
+    promises.push(textNodePromises);
+
+    await Promise.all(promises);
+  }
+}
+
 function selectLanguage(language) {
-  // document.querySelector(".bhashini-dropdown-btn-text").textContent = language;
+  document.querySelector(".bhashini-dropdown-btn-text").textContent = language;
   document.getElementById("bhashiniLanguageDropdown").classList.remove("show");
-  var selectedLang = supportedTargetLangArr.find(
+  const selectedLang = supportedTargetLangArr.find(
     (lang) => lang.label === language
   );
   if (selectedLang) {
@@ -695,26 +473,30 @@ window.onclick = function (event) {
   }
 };
 
-var handleCloseFeedbackModal = () => {
-  var feedbackModal = document.querySelector(".bhashini-feedback-modal");
+const handleCloseFeedbackModal = () => {
+  const feedbackModal = document.querySelector(".bhashini-feedback-modal");
   feedbackModal.style.display = "none";
-  var feedbackTextArea = document.querySelector(".feedback-textarea");
+  const feedbackTextArea = document.querySelector(".feedback-textarea");
   feedbackTextArea.style.display = "none";
   selectedRating = 0;
   document.querySelectorAll(".star").forEach((star) => {
     star.classList.remove("selected");
   });
-  var suggestedResponseCheckbox = document.getElementById(
+  const suggestedResponseCheckbox = document.getElementById(
     "suggested-feedback-checkbox"
   );
   suggestedResponseCheckbox.checked = false;
-  var suggestedFeedbackContainer = document.querySelector(
+  const suggestedFeedbackContainer = document.querySelector(
     ".suggested-feedback-container"
   );
   suggestedFeedbackContainer.style.display = "none";
 };
 
-var handleFeedbackSubmission = async (rating, feedback, suggestedResponse) => {
+const handleFeedbackSubmission = async (
+  rating,
+  feedback,
+  suggestedResponse
+) => {
   if (!rating) {
     showToast("Please provide rating");
     return;
@@ -724,7 +506,7 @@ var handleFeedbackSubmission = async (rating, feedback, suggestedResponse) => {
     return;
   }
 
-  var suggestedResponseCheckbox = document.getElementById(
+  const suggestedResponseCheckbox = document.getElementById(
     "suggested-feedback-checkbox"
   );
   if (suggestedResponseCheckbox.checked && !suggestedResponse) {
@@ -732,11 +514,11 @@ var handleFeedbackSubmission = async (rating, feedback, suggestedResponse) => {
     return;
   }
 
-  var submitButton = document.querySelector(".submit-feedback");
+  const submitButton = document.querySelector(".submit-feedback");
   submitButton.disabled = true;
   submitButton.textContent = "Submitting...";
 
-  var payload = {
+  const payload = {
     feedbackTimeStamp: Math.floor(new Date().getTime() / 1000),
     feedbackLanguage: "en",
     pipelineInput: {
@@ -795,17 +577,20 @@ var handleFeedbackSubmission = async (rating, feedback, suggestedResponse) => {
         },
       ],
     },
+    feedbackSource: {
+      application: "Bhashini Translation Plugin",
+      website: window.location.href,
+    },
   };
   try {
-    var res = await fetch(`${TRANSLATION_PLUGIN_API_BASE_URL}/v1/feedback`, {
+    const res = await fetch(`${TRANSLATION_PLUGIN_API_BASE_URL}/v1/feedback`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
-    var data = await res.json();
-    console.log(data);
+    const data = await res.json();
     showToast("Feedback Submitted Successfully");
     submitButton.textContent = "Submit";
     submitButton.disabled = false;
@@ -816,22 +601,109 @@ var handleFeedbackSubmission = async (rating, feedback, suggestedResponse) => {
   }
 };
 
-var showFeedbackdiv = () => {
-  var feedbackdiv = document.querySelector(".bhashini-feedback-div");
+const showFeedbackdiv = () => {
+  const feedbackdiv = document.querySelector(".bhashini-feedback-div");
   feedbackdiv.style.visibility = "visible";
 };
 
-var hideFeedbackdiv = () => {
-  var feedbackdiv = document.querySelector(".bhashini-feedback-div");
+const hideFeedbackdiv = () => {
+  const feedbackdiv = document.querySelector(".bhashini-feedback-div");
   feedbackdiv.style.visibility = "hidden";
 };
 
-var pluginContainer = document.querySelector(".bhashini-plugin-container");
+function processIframeContent(iframe, targetLang) {
+  try {
+    // Make sure we can access the iframe's content (same-origin check)
+    if (iframe.contentDocument && iframe.contentDocument.body) {
+      // Translate all text nodes within the iframe
+      translateElementText(iframe.contentDocument.body, targetLang);
 
-// feedback button
+      // Translate placeholders within the iframe
+      const iframeInputs = iframe.contentDocument.querySelectorAll(
+        "input[placeholder], textarea[placeholder]"
+      );
+      const placeholders = Array.from(iframeInputs).map(
+        (input) => input.placeholder
+      );
+
+      if (placeholders.length > 0) {
+        translateTextChunks(placeholders, targetLang).then(
+          (translatedPlaceholders) => {
+            iframeInputs.forEach((input, index) => {
+              input.placeholder =
+                translatedPlaceholders[index].target || placeholders[index];
+            });
+          }
+        );
+      }
+
+      // Set up mutation observer for the iframe to handle dynamic content
+      const iframeObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+            mutation.addedNodes.forEach((node) => {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                translateElementText(node, targetLang);
+              }
+            });
+          }
+        });
+      });
+
+      // Start observing the iframe's document
+      iframeObserver.observe(iframe.contentDocument.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  } catch (e) {
+    console.error("Error accessing iframe content:", e);
+  }
+}
+
+function translateSameOriginIframes(targetLang) {
+  // Find all iframes in the document
+  const iframes = document.querySelectorAll("iframe");
+
+  // Process each iframe
+  iframes.forEach((iframe) => {
+    // Handle already loaded iframes
+    if (
+      iframe.contentDocument &&
+      iframe.contentDocument.readyState === "complete"
+    ) {
+      processIframeContent(iframe, targetLang);
+    }
+
+    // Also set up a load event listener for iframes that haven't loaded yet
+    iframe.addEventListener("load", function () {
+      processIframeContent(iframe, targetLang);
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  // check if isSelectedLangEnglish is present in sessionStorage
+  const isSelectedLang = sessionStorage.getItem("selectedLang");
+  if (isSelectedLang) {
+    sessionStorage.removeItem("selectedLang");
+    defaultTranslatedLanguage = null;
+  }
+
+  /**
+   * Check if the defaultTranslatedLanguage is present and not equal to "en", then set the language to the defaultTranslatedLanguage
+   * Otherwise, set the language to the preferred language stored in localStorage
+   */
+  const languageToUse =
+    defaultTranslatedLanguage && defaultTranslatedLanguage !== "en"
+      ? defaultTranslatedLanguage
+      : localStorage.getItem("preferredLanguage") || initialPreferredLanguage;
 
 // Create translation popup elements
-var wrapperButton = document.createElement("div");
+  // TEMPORARILY DISABLED: Original Bhashini overlay
+  console.log("🚫 Original Bhashini overlay has been temporarily disabled");
+  /*
+  const wrapperButton = document.createElement("div");
 wrapperButton.setAttribute(
   "class",
   "dont-translate bhashini-skip-translation bhashini-dropdown"
@@ -840,40 +712,36 @@ wrapperButton.setAttribute("id", "bhashini-translation");
 wrapperButton.setAttribute("title", "Translate this page!");
 // wrapperButton.innerHTML = `<select class="translate-plugin-dropdown" id="translate-plugin-target-language-list"></select><img src=${TRANSLATION_PLUGIN_API_BASE_URL}/bhashini_logo.png alt="toggle translation popup">`;
 wrapperButton.innerHTML = `
-        <button class="bhashini-dropdown-btn" style="display: flex; align-items: center;">
+        <button class="bhashini-dropdown-btn">
           <div class="bhashini-dropdown-btn-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="18" viewBox="0 0 17 15" fill="${languageIconColor}">
-  <path d="M15.0924 14.0224L14.1132 11.2022H10.557L9.57783 14.0224H8.13477L11.6265 4.20654H13.0695L16.5483 14.0224H15.0924ZM12.7989 7.16361C12.7732 7.06322 12.7259 6.91262 12.6572 6.71184C12.5971 6.50192 12.537 6.29201 12.4768 6.08209C12.4167 5.86305 12.3695 5.68508 12.3351 5.54818C12.2922 5.73071 12.2406 5.9315 12.1805 6.15054C12.129 6.36046 12.0774 6.55668 12.0259 6.73922C11.9743 6.91262 11.9314 7.05409 11.897 7.16361L10.9693 9.91533H13.7266L12.7989 7.16361Z" fill="${languageIconColor}"/>
-  <path d="M5.83714 6.46105C5.83714 7.98312 4.89482 8.85288 3.61222 8.85288C2.05478 8.85288 1.00776 7.76568 0 4.47303L0.929231 4.02262C1.63597 6.44552 2.38197 7.71909 3.52061 7.71909C4.29279 7.71909 4.80321 7.20655 4.80321 6.32126C4.80321 5.60682 4.39749 5.04769 3.88707 4.61281C3.55987 4.72153 3.16724 4.79919 2.72225 4.84579L2.51285 3.74306C4.14882 3.49456 4.58072 3.07521 4.58072 2.22098C4.58072 1.5376 4.20117 1.10273 3.49443 1.10273C2.90548 1.10273 2.34271 1.32017 1.77994 1.72398L1.43965 0.636786C2.04169 0.23297 2.72225 0 3.5337 0C5.0257 0 5.62774 1.0406 5.62774 2.23652C5.62774 3.04415 5.37907 3.69646 4.79012 4.14687L4.8163 4.17794C5.23511 4.30219 5.69318 4.34878 6.0989 4.34878C6.50462 4.34878 6.93651 4.30219 7.39459 4.16241V1.25804H6.43918V0.155313H9.81582V1.25804H8.45469V9.81582H7.39459V5.31173C7.04122 5.42045 6.67476 5.45151 6.3083 5.45151C6.0989 5.45151 5.85023 5.43598 5.60156 5.38938C5.75862 5.71554 5.83714 6.08829 5.83714 6.46105Z" fill="${languageIconColor}"/>
-</svg>
+            <img src=${TRANSLATION_PLUGIN_API_BASE_URL}/v2/languageLogo.svg  alt="toggle translation popup">
+            <p class="dont-translate bhashini-skip-translation bhashini-dropdown-btn-text"> 
+              ${
+                languageToUse === "en"
+                  ? "English"
+                  : supportedTargetLangArr.find(
+                      (lang) => lang.code === languageToUse
+                    )?.label || "English"
+              }
+    
+            </p>
           </div>
-          <span id="bhashini-selected-language" style="margin-left:8px; color: #EBEBEB;
-font-family: Roboto;
-// font-size: 12px;
-font-style: normal;
-font-weight: 500;
-line-height: normal;
-">Loading...</span>
-          <svg class="bhashini-dropdown-arrow" style="margin-left:8px;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6L8 10L12 6" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M5.3295 7.36997C5.76884 6.87668 6.48116 6.87668 6.9205 7.36997L11 11.9505L15.0795 7.36997C15.5188 6.87668 16.2312 6.87668 16.6705 7.36997C17.1098 7.86326 17.1098 8.66305 16.6705 9.15635L11.7955 14.63C11.3562 15.1233 10.6438 15.1233 10.2045 14.63L5.3295 9.15635C4.89017 8.66305 4.89017 7.86326 5.3295 7.36997Z" fill="white"/>
+          </svg>
         </button>
         <div class="bhashini-dropdown-content" id="bhashiniLanguageDropdown">
         </div>
     `;
-pluginContainer.appendChild(wrapperButton);
-
-// Set the selected language label beside the icon
-function setSelectedLanguageLabel() {
-  var selectedLangObj = supportedTargetLangArr.find(
-    (lang) => lang.code === selectedTargetLanguageCode
-  );
-  var label = selectedLangObj
-    ? selectedLangObj.label
-    : selectedTargetLanguageCode;
-  var labelSpan = document.getElementById("bhashini-selected-language");
-  if (labelSpan) labelSpan.textContent = label;
-}
-setSelectedLanguageLabel();
-var modal = document.createElement("div");
+  // wrapperButton.appendChild(feedbackDiv);
+  document.body.appendChild(wrapperButton);
+  */
+  // wrapperButton.addEventListener("mouseenter", showFeedbackdiv);
+  // wrapperButton.addEventListener("mouseleave", hideFeedbackdiv);
+  // TEMPORARILY DISABLED: Original Bhashini feedback modal
+  /*
+  // Create Feedback Modal
+  const modal = document.createElement("div");
 modal.setAttribute("class", "bhashini-feedback-modal");
 modal.innerHTML = `
   <div class="bhashini-feedback-content">
@@ -924,40 +792,20 @@ modal.innerHTML = `
         </span>
       </div>
         </div>
-
-       <!-- <div style="margin-top: 1rem;">
-          <p> 
-            <strong> Page URL: </strong> 
-            <span id="current-page-url" style="text-decoration: underline;"> </span> 
-          </p>
-        </div> -->
-
-
-     
       <textarea
       style = "display: none;"
         class="feedback-textarea"
-      placeholder="Describe your issues here..."></textarea>
+      placeholder="Describe your issues here..." aria-label="Describe your issues here"></textarea>
         <div class="suggested-feedback-container"
             style="display: none;"
         >
         <input type="checkbox" id="suggested-feedback-checkbox">
 
-      <label for= "suggested-feedback-checkbox">Do you like to give feedback</label>
-       
-
-     
-    <!-- <div style="margin-top: 1rem;">
-      <span class="feedback-disclaimer">
-       <strong style=" margin-right: 0.25rem;">Disclaimer:</strong>Please report any issues related to BHASHINI translated content only.
-      </span>
-     </div> -->
-
-
+      <label for= "suggested-feedback-checkbox">Would you like to provide feedback</label>
        <textarea
       style = "display: none;"
         class="feedback-suggested-feedback"
-      placeholder="Suggested Feedback"></textarea>
+      placeholder="Suggested Feedback" aria-label="Suggested Feedback"></textarea>
         </div>
       <button class="submit-feedback">Submit</button>
       </div>
@@ -965,8 +813,10 @@ modal.innerHTML = `
 `;
 
 document.body.appendChild(modal);
-// console.log(document.querySelector(".close-modal"), "close");
+  */
 
+  // TEMPORARILY DISABLED: Original Bhashini modal event listeners and star rating
+  /*
 // Close modal on click of close button
 document.querySelector(".close-modal").addEventListener("click", () => {
   handleCloseFeedbackModal();
@@ -978,7 +828,7 @@ window.addEventListener("click", (e) => {
     modal.style.display = "none";
   }
 });
-var stars = document.querySelectorAll(".star");
+  const stars = document.querySelectorAll(".star");
 // Star Rating Selection
 stars.forEach((star, index) => {
   star.addEventListener("mouseenter", function () {
@@ -992,18 +842,18 @@ stars.forEach((star, index) => {
   star.addEventListener("click", function () {
     selectedRating = index + 1; // Store the selected rating
     highlightStars(index, "selected");
-    var textArea = document.querySelector(".feedback-textarea");
-    var suggestedFeedbackContainer = document.querySelector(
+      const textArea = document.querySelector(".feedback-textarea");
+      const suggestedFeedbackContainer = document.querySelector(
       ".suggested-feedback-container"
     );
     if (selectedRating < 4) {
       textArea.style.display = "block";
       suggestedFeedbackContainer.style.display = "block";
-      var suggestedFeedbackCheckbox = document.getElementById(
+        const suggestedFeedbackCheckbox = document.getElementById(
         "suggested-feedback-checkbox"
       );
       suggestedFeedbackCheckbox.addEventListener("change", function () {
-        var suggestedFeedback = document.querySelector(
+          const suggestedFeedback = document.querySelector(
           ".feedback-suggested-feedback"
         );
         if (this.checked) {
@@ -1032,70 +882,52 @@ function highlightStars(index, className) {
 function removeHoverEffect() {
   stars.forEach((s) => s.classList.remove("hovered"));
 }
+  */
+  // TEMPORARILY DISABLED: Original Bhashini overlay event listeners
+  /*
 wrapperButton.addEventListener("click", (e) => {
   e.stopPropagation();
   e.preventDefault();
   toggleDropdown();
 });
+  */
 
-var submitFeedbackButton = document.querySelector(".submit-feedback");
+  // TEMPORARILY DISABLED: Original Bhashini feedback submission
+  /*
+  const submitFeedbackButton = document.querySelector(".submit-feedback");
 submitFeedbackButton.addEventListener("click", () => {
-  var feedbackText = document.querySelector(".feedback-textarea").value;
-  var suggestedResponse = document.querySelector(
+    const feedbackText = document.querySelector(".feedback-textarea").value;
+    const suggestedResponse = document.querySelector(
     ".feedback-suggested-feedback"
   ).value;
   handleFeedbackSubmission(selectedRating, feedbackText, suggestedResponse);
 });
+  */
 
-// Fetch supported translation languages
-fetchTranslationSupportedLanguages();
+  // TEMPORARILY DISABLED: Original Bhashini overlay positioning
+  /*
+  // Now that the element is in the DOM, its dimensions can be calculated
+  // Set the position using the calculated width
+  // Set the position using the calculated width
+  const calculatedPosX = posX - (218 * 100) / window.innerWidth;
+  const adjustedPosX = calculatedPosX < 0 ? posX : calculatedPosX;
+  wrapperButton.style.left = `${adjustedPosX}%`;
+  const calculatedPosY = posY - (58 * 100) / window.innerHeight;
+  const adjustedPosY = calculatedPosY < 0 ? posY : calculatedPosY;
+  wrapperButton.style.bottom = `${adjustedPosY}%`;
+  */
+  // Add event listener for dropdown change
+  // const targetLanguageList = document.getElementById("translate-plugin-target-language-list");
+  // if (targetLanguageList) {
+  //   targetLanguageList.addEventListener('change', onDropdownChange);
+  // }
 
-async function translateElementText(element, target_lang) {
-  var promises = [];
-  var textNodes = getTextNodesToTranslate(element);
-  if (textNodes.length > 0) {
-    var textContentArray = textNodes.map((node, index) => {
-      var id = `translation-${Date.now()}-${index}`;
-      // Store original text in session storage
-      if (node.parentNode) {
-        node.parentNode.setAttribute("data-translation-id", id);
-      }
-      return { text: node.content, id, node };
-    });
-    var textChunks = chunkArray(textContentArray, CHUNK_SIZE);
+  // TEMPORARILY DISABLED: Original Bhashini overlay language fetching
+  // fetchTranslationSupportedLanguages();
 
-    // Create an array to hold promises for each chunk translation
-    var textNodePromises = textChunks.map(async (chunk) => {
-      var texts = chunk.map(({ text }) => text);
-      // if (target_lang === "en") {
-      //         return;
-      // }
-      var translatedTexts = await translateTextChunks(texts, target_lang);
-      chunk.forEach(({ node }, index) => {
-        var translatedText = translatedTexts[index].target || texts[index];
-
-        if (node.type === "text") {
-          node.node.nodeValue = translatedText;
-        }
-        if (node.type === "value") {
-          node.node.value = translatedText;
-        }
-        if (node.type === "placeholder") {
-          node.node.placeholder = translatedText;
-        }
-        if (node.type === "title") {
-          node.node.setAttribute("title", translatedText);
-        }
-      });
-    });
-    promises.push(textNodePromises);
-
-    await Promise.all(promises);
-  }
-}
-var nodesToTranslate = []; // Array to store nodes and their associated language codes
-var debounceTimer = null;
-var DEBOUNCE_DELAY = 250;
+  let nodesToTranslate = []; // Array to store nodes and their associated language codes
+  let debounceTimer = null;
+  const DEBOUNCE_DELAY = 250;
 
 function translateElementTextNodes(node, targetLangCode) {
   nodesToTranslate.push({ node, targetLangCode });
@@ -1122,66 +954,89 @@ function translateElementTextNodes(node, targetLangCode) {
 }
 
 // Create a new MutationObserver
-var observer = new MutationObserver((mutations) => {
+  const observer = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
     if (mutation.type === "childList" && mutation.target.innerHTML) {
-      // If a new element is added, replaced, or changed, translate its text nodes
-      // var targetLang = document.getElementById("translate-plugin-target-language-list").value;
       if (selectedTargetLanguageCode) {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
+              // console.log("Translating added node:", node.textContent);
             translateElementTextNodes(node, selectedTargetLanguageCode);
           }
         });
       }
     }
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const iframes = node.querySelectorAll("iframe");
+          iframes.forEach((newIframes) => {
+            if (newIframes.length > 0 && selectedTargetLanguageCode) {
+              newIframes.forEach((iframe) => {
+                // For iframes that are already loaded
+                if (
+                  iframe.contentDocument &&
+                  iframe.contentDocument.readyState === "complete"
+                ) {
+                  processIframeContent(iframe, selectedTargetLanguageCode);
+                }
+
+                // For iframes that will load later
+                iframe.addEventListener("load", function () {
+                  processIframeContent(iframe, selectedTargetLanguageCode);
+                });
+              });
+            }
+          });
+        }
+      });
   });
 });
 
 // Start observing the document body for changes
 observer.observe(document.body, { childList: true, subtree: true });
 
-// check if isSelectedLangEnglish is present in sessionStorage
-var isSelectedLang = sessionStorage.getItem("selectedLang");
-if (isSelectedLang) {
-  sessionStorage.removeItem("selectedLang");
-  defaultTranslatedLanguage = null;
-}
+  // TEMPORARILY DISABLED: Original Bhashini overlay positioning adjustments
+  /*
+  // Add event listener for window resize to adjust widget position
+  window.addEventListener("resize", adjustWidgetPosition);
 
-/**
- * Check if the defaultTranslatedLanguage is present and not equal to "en", then set the language to the defaultTranslatedLanguage
- * Otherwise, set the language to the preferred language stored in localStorage
- */
+  // Adjust the widget position on initial load
+  adjustWidgetPosition();
+  */
 
-var languageToUse =
-  defaultTranslatedLanguage && defaultTranslatedLanguage !== "en"
-    ? defaultTranslatedLanguage
-    : localStorage.getItem("preferredLanguage") || initialPreferredLanguage;
 if (languageToUse) {
   selectedTargetLanguageCode = languageToUse;
   // document.getElementById("translate-plugin-target-language-list").value =
   //   languageToUse;
   isContentTranslated = true;
   translateAllTextNodes(languageToUse);
-}
-
-// var languageToUse =
-//   defaultTranslatedLanguage && defaultTranslatedLanguage !== "en"
-//     ? defaultTranslatedLanguage
-//     : localStorage.getItem("preferredLanguage");
-// if (languageToUse) {
-//   selectedTargetLanguageCode = languageToUse;
-//   // document.getElementById("translate-plugin-target-language-list").value =
-//   //   languageToUse;
-//   isContentTranslated = true;
-//   translateAllTextNodes(languageToUse);
-// }
+    translateSameOriginIframes(languageToUse);
+  }
+});
 
 // Function to handle dropdown change
 function onDropdownChange(event) {
-  var selectedValue = event.target.value;
+  const selectedValue = event.target.value;
+  // If English is selected, restore translations from session storage
+  // if (selectedValue && selectedValue === "en" && isContentTranslated) {
+  //     // selectedTargetLanguageCode = ""
+  //     // restoreTranslations();
+  //     localStorage.removeItem('preferredLanguage');
+  //     window.location.reload();
+  // } else if(selectedValue && selectedValue !== "en") {
+  //     selectedTargetLanguageCode = selectedValue;
+  //     isContentTranslated = true;
+  //     // Store preferred language in localStorage
+  //     localStorage.setItem('preferredLanguage', selectedValue);
+  //     sessionStorage.setItem("isSelectedLang",selectedValue);
+
+  //     // Perform translation for the selected language
+  //     translateAllTextNodes(selectedTargetLanguageCode);
+  //     // showToast(`This page is translated using Bhashini's Machine Learning models.`);
+  // }
   isContentTranslated = true;
   sessionStorage.setItem("selectedLang", selectedValue);
+  // Store preferred language in localStorage
   localStorage.setItem("preferredLanguage", selectedValue);
   // Perform translation for the selected language
   // translateAllTextNodes(selectedValue);
@@ -1190,7 +1045,7 @@ function onDropdownChange(event) {
 
 // Function to show a toast messages
 function showToast(message) {
-  var toast = document.createElement("div");
+  const toast = document.createElement("div");
   toast.className = "bhashini-toast";
   toast.textContent = message;
   toast.setAttribute("aria-label", message);
@@ -1209,9 +1064,9 @@ function showToast(message) {
 
 // Function to restore translations from session storage
 // function restoreTranslations() {
-//   var textNodes = getTextNodesToTranslate(document.body);
+//   const textNodes = getTextNodesToTranslate(document.body);
 //   textNodes.forEach((node) => {
-//     var id = node.parentNode.getAttribute("data-translation-id");
+//     const id = node.parentNode.getAttribute("data-translation-id");
 //     if (id && translationCache[id]) {
 //       node.nodeValue = translationCache[id];
 //     }
@@ -1221,11 +1076,11 @@ function showToast(message) {
 
 // Function to translate all text nodes in the document
 async function translateAllTextNodes(target_lang) {
-  var promises = [];
-  var textNodes = getTextNodesToTranslate(document.body);
+  const promises = [];
+  const textNodes = getTextNodesToTranslate(document.body);
   if (textNodes.length > 0) {
-    var textContentArray = textNodes.map((node, index) => {
-      var id = `translation-${Date.now()}-${index}`;
+    const textContentArray = textNodes.map((node, index) => {
+      const id = `translation-${Date.now()}-${index}`;
       // Store original text in session storage
       translationCache[id] = node.content;
       if (node.parentNode) {
@@ -1233,17 +1088,17 @@ async function translateAllTextNodes(target_lang) {
       }
       return { text: node.content, id, node };
     });
-    var textChunks = chunkArray(textContentArray, CHUNK_SIZE);
+    const textChunks = chunkArray(textContentArray, CHUNK_SIZE);
 
     // Create an array to hold promises for each chunk translation
-    var textNodePromises = textChunks.map(async (chunk) => {
-      var texts = chunk.map(({ text }) => text);
+    const textNodePromises = textChunks.map(async (chunk) => {
+      const texts = chunk.map(({ text }) => text);
       // if (target_lang === "en") {
       //         return;
       // }
-      var translatedTexts = await translateTextChunks(texts, target_lang);
+      const translatedTexts = await translateTextChunks(texts, target_lang);
       chunk.forEach(({ node }, index) => {
-        var translatedText = translatedTexts[index].target || texts[index];
+        const translatedText = translatedTexts[index].target || texts[index];
 
         if (node.type === "text") {
           node.node.nodeValue = translatedText;
@@ -1261,26 +1116,10 @@ async function translateAllTextNodes(target_lang) {
     });
     promises.push(textNodePromises);
 
-    // Wait for all translations to compvare
+    // Wait for all translations to complete
 
     await Promise.all(promises);
 
-    // var targetLangSelectElement = document.getElementById(
-    //   "translate-plugin-target-language-list"
-    // );
-    // Check if the targetLangSelectElement exists
-    // if (targetLangSelectElement) {
-    //   // Loop through each option element
-    //   Array.from(targetLangSelectElement.options).forEach((option) => {
-    //     // Check if the value is not "en", not equal to target_lang, and not an empty string
-    //     if (option.value === target_lang) {
-    //       // Keep the default selected option if it's the target language
-    //       option.selected = true;
-    //     }
-    //   });
-    // } else {
-    //   console.error("Target language select element not found.");
-    // }
     const preferredLanguage = localStorage.getItem("preferredLanguage");
 
     if (preferredLanguage === "as") {
@@ -1357,7 +1196,7 @@ async function translateAllTextNodes(target_lang) {
       );
     } else if (preferredLanguage === "mni") {
       showToast(
-        `ꯃꯁꯤꯒꯤ ꯆꯦꯐꯣꯡ ꯑꯁꯤ ꯚꯥꯁꯤꯅꯤꯒꯤ ꯑꯦ. ꯑꯥꯏꯕ ꯃꯣꯗꯦꯜꯁꯤꯡ ꯁꯤꯖꯤꯟꯅꯗꯨꯅ ꯍꯟꯗꯣꯛꯈ꯭ꯔꯦ ꯫ ꯁꯣꯔꯁꯀꯤ ꯃꯆꯥꯛ ꯑꯁꯤ ꯏꯪꯂꯤꯁꯇ ꯂꯩ ꯫ ꯍꯟꯗꯣꯛꯄꯒ ꯃꯔꯤ ꯂꯩꯅꯕ ꯆꯤꯡꯅꯕ ꯑꯃꯍꯦꯛꯇꯒꯤꯗꯃꯛ, ꯆꯥꯟꯕꯤꯗꯨꯅ ceo-dibd@digitalindia.gov.in ꯗ ꯀꯣꯟꯇꯦꯛ ꯇꯧꯕꯤꯌꯨ`
+        `ꯃꯁꯤꯒꯤ ꯆꯦꯐꯣꯡ ꯑꯁꯤ ꯚꯥꯁꯤꯅꯤꯒꯤ ꯑꯦ. ꯑꯥꯏ. ꯅ ꯆꯂꯥꯏꯕ ꯃꯣꯗꯦꯜꯁꯤꯡ ꯁꯤꯖꯤꯟꯅꯗꯨꯅ ꯍꯟꯗꯣꯛꯈ꯭ꯔꯦ ꯫ ꯁꯣꯔꯁꯀꯤ ꯃꯆꯥꯛ ꯑꯁꯤ ꯏꯪꯂꯤꯁꯇ ꯂꯩ ꯫ ꯍꯟꯗꯣꯛꯄꯒ ꯃꯔꯤ ꯂꯩꯅꯕ ꯆꯤꯡꯅꯕ ꯑꯃꯍꯦꯛꯇꯒꯤꯗꯃꯛ, ꯆꯥꯟꯕꯤꯗꯨꯅ ceo-dibd@digitalindia.gov.in ꯗ ꯀꯣꯟꯇꯦꯛ ꯇꯧꯕꯤꯌꯨ`
       );
     } else if (preferredLanguage === "sd") {
       showToast(
@@ -1365,7 +1204,7 @@ async function translateAllTextNodes(target_lang) {
       );
     } else if (preferredLanguage === "gom") {
       showToast(
-        `भाशिनीचो एआय- संचालित मॉडेल वापरून ह्या पानाचें भाशांतर केलां. स्रोत मजकूर इंग्लीश भाशेंत आसा. भाशांतरा संबंदीत खंयच्याय प्रस्नां खातीर, उपकार करून ceo-dibd@digitalindia.co.in कडेन संपर्क सादचो.`
+        `भाशिनीचो एआय- संचालित मॉडेल वापरून ह्या पानाचें भाशांतर केलां. स्रोत मजकूर इंग्लीश भाशेंत आसा. भाशांतरा संबंदीत खंयच्याय प्रस्नां खातीर, उपकार करून ceo-dibd@digitalindia.gov.in कडेन संपर्क सादचो.`
       );
     } else if (preferredLanguage === "ks") {
       showToast(
@@ -1381,8 +1220,8 @@ async function translateAllTextNodes(target_lang) {
 sessionStorage.setItem("translationCache", JSON.stringify(translationCache));
 
 // Function to adjust widget position based on device width
-var adjustWidgetPosition = () => {
-  var wrapperButton = document.getElementById("bhashini-translation");
+const adjustWidgetPosition = () => {
+  const wrapperButton = document.getElementById("bhashini-translation");
   if (window.innerWidth <= 768) {
     // Position for mobile devices
     wrapperButton.style.left = `calc(100vw - ${
@@ -1390,7 +1229,7 @@ var adjustWidgetPosition = () => {
     }px)`;
     wrapperButton.style.bottom = `10px`;
   } else if (window.innerWidth <= 1024) {
-    // Position for tabvar devices
+    // Position for tablet devices
     wrapperButton.style.left = `calc(100vw - ${
       wrapperButton.offsetWidth + 20
     }px)`;
@@ -1399,7 +1238,7 @@ var adjustWidgetPosition = () => {
 };
 
 // CSS for toast message
-var toastStyles = `
+const toastStyles = `
     .bhashini-toast {
         position: fixed;
         left: 50%;
@@ -1419,6 +1258,6 @@ var toastStyles = `
     }
 `;
 
-var styleSheet = document.createElement("style");
+const styleSheet = document.createElement("style");
 styleSheet.innerText = toastStyles;
 document.head.appendChild(styleSheet);
