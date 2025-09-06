@@ -523,15 +523,9 @@ class DFSTraversal {
     }
     
     isElementAlreadyTranslated(node, text) {
-        // Check if this specific node has been translated
-        if (window.enhancedEngine && window.enhancedEngine.translatedElements.has(node)) {
-            return true;
-        }
+        // Don't check element translation state - always process since content reverts to English
         
-        // Check if this exact text has been translated
-        if (window.enhancedEngine && window.enhancedEngine.translatedTexts.has(text.trim())) {
-            return true;
-        }
+        // Don't check translation state - always process since content reverts to English
         
         // Check if the text appears to be already translated (non-Latin characters)
         if (text.trim().length > 3 && REGEX_PATTERNS.unicode.test(text.trim())) {
@@ -596,6 +590,7 @@ class BatchProcessor {
         console.log(`📊 Maximum batch size: ${maxBatchSize}`);
         
         const avgTextLength = textNodes.reduce((sum, node) => {
+            // Handle both DOM text nodes (textContent) and processed nodes (content)
             const textLength = node.content ? node.content.length : (node.textContent ? node.textContent.length : 0);
             return sum + textLength;
         }, 0) / textNodes.length;
@@ -727,19 +722,10 @@ class BatchProcessor {
         console.log(`🎯 Target: ${targetLang}`);
         console.log(`🌍 Source: ${sourceLang || 'auto'}`);
         
-        // Filter out already translated elements
-        console.log(`🔍 Filtering for untranslated content...`);
-        const untranslatedNodes = textNodes.filter(item => {
-            const isTranslated = window.enhancedEngine && 
-                (window.enhancedEngine.translatedElements.has(item.node) ||
-                 window.enhancedEngine.translatedTexts.has(item.content.trim()));
-            
-            if (isTranslated) {
-                console.log(`⏭️ Skipping already translated: "${item.content.substring(0, 50)}..."`);
-            }
-            
-            return !isTranslated;
-        });
+        // Process all text nodes - don't filter by translation state
+        // since content reverts to English when navigating away
+        console.log(`🔍 Processing all text nodes for translation...`);
+        const untranslatedNodes = textNodes;
         
         console.log(`📊 Filtering Results:`);
         console.log(`   📝 Total items in batch: ${textNodes.length}`);
@@ -776,16 +762,14 @@ class BatchProcessor {
             // Map results back to original textNodes array
             let resultIndex = 0;
             return textNodes.map(item => {
-                const isTranslated = window.enhancedEngine && 
-                    (window.enhancedEngine.translatedElements.has(item.node) ||
-                     window.enhancedEngine.translatedTexts.has(item.content.trim()));
-                
-                if (isTranslated && resultIndex < translations.length) {
+                // Always translate - don't check translation state
+                // since content reverts to English when navigating away
+                if (resultIndex < translations.length) {
                     const translation = translations[resultIndex++];
-                if (translation && translation.target) {
+                    if (translation && translation.target) {
                         this.updateDOMNode(item, translation.target);
                         return { ...item, translated: true, translation: translation.target, success: true };
-                }
+                    }
                 }
                 return { ...item, translated: true, translation: item.content, success: true, skipped: true };
             });
@@ -944,12 +928,19 @@ class TranslationEngine {
         
         console.log('🚀 Initializing Translation Engine...');
         
+        // Reset translation state on fresh initialization
+        this.resetTranslationState();
+        
         // Create intersection observer for lazy loading (following anuvadini pattern)
         this.lazyObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(async (entry) => {
                 if (entry.isIntersecting) {
                     const node = entry.target;
-                    const textNodes = this.getTextNodes(node);
+                    // Use getTextNodesToTranslate to get properly formatted text nodes
+                    const textNodes = this.dfsTraversal.getTextNodesToTranslate(node, {
+                        enableCache: false,
+                        enableAdvancedFiltering: true
+                    });
                     // Process text nodes directly - check current language dynamically
                     const currentLang = localStorage.getItem("selectedLanguage");
                     if (textNodes.length > 0 && currentLang && currentLang !== "en-IN" && currentLang !== "en") {
@@ -1050,9 +1041,15 @@ class TranslationEngine {
     // Function to observe initial content (following anuvadini pattern)
     observeInitialContent() {
         try {
-            this.getTextNodes(document).forEach((textNode) => {
+            // Use getTextNodesToTranslate to get properly formatted text nodes
+            const textNodes = this.dfsTraversal.getTextNodesToTranslate(document.body, {
+                enableCache: false,
+                enableAdvancedFiltering: true
+            });
+            
+            textNodes.forEach((textNodeData) => {
                 try {
-                    this.lazyObserver.observe(textNode.parentNode);
+                    this.lazyObserver.observe(textNodeData.node.parentNode);
                 } catch (e) {
                     // Ignore errors like anuvadini does
                 }
@@ -1063,28 +1060,10 @@ class TranslationEngine {
     }
     
     setupAutoTranslationTriggers() {
-        // Check for saved language on page load (like Anuvadini)
-        const savedLanguage = localStorage.getItem("selectedLanguage");
-        const sessionLanguage = sessionStorage.getItem("selectedLang");
-        const preferredLanguage = localStorage.getItem("preferredLanguage");
+        console.log('🔧 Setting up auto-translation triggers...');
         
-        console.log(`🔍 Checking for saved languages: localStorage="${savedLanguage}", sessionStorage="${sessionLanguage}", preferred="${preferredLanguage}"`);
-        
-        // Determine which language to use (prioritize localStorage like Anuvadini)
-        const languageToUse = savedLanguage || sessionLanguage || preferredLanguage;
-        
-        if (languageToUse && languageToUse !== "en-IN" && languageToUse !== "en") {
-            console.log(`🎯 Auto-translation triggered for language: ${languageToUse}`);
-            this.autoTranslationEnabled = true;
-            this.currentTargetLanguage = languageToUse;
-            
-            // Start translation after delay (like Anuvadini)
-            setTimeout(() => {
-                this.autoTranslatePage(languageToUse);
-            }, this.initializationDelay);
-                    } else {
-            console.log('ℹ️ No auto-translation needed (English or no saved language)');
-        }
+        // Note: Auto-translation logic is now handled in the global initialization
+        // to prevent duplicate auto-translation calls
         
         // Listen for language changes (like both utilities)
         this.setupLanguageChangeListeners();
@@ -1094,6 +1073,8 @@ class TranslationEngine {
         
         // Setup mutation observer (like Bhashini)
         this.setupMutationObserver();
+        
+        console.log('✅ Auto-translation triggers setup complete');
     }
     
     async autoTranslatePage(targetLang) {
@@ -1143,30 +1124,67 @@ class TranslationEngine {
         this.setupOverlayIntegration();
     }
     
-    handleLanguageChange(newLanguage) {
-        console.log('🔄 Language changed to:', newLanguage);
+    handleLanguageChange(newLanguage, userInitiated = true) {
+        console.log('🔄 Language changed to:', newLanguage, 'userInitiated:', userInitiated);
         
-        // Store the new language and reload page like anuvadini
+        // If English is selected, clear all translation state and reload to original state
+        if (newLanguage === 'en' || newLanguage === 'en-IN') {
+            console.log('🔄 English selected - clearing translation state');
+            localStorage.removeItem("selectedLanguage");
+            sessionStorage.removeItem("selectedLang");
+            localStorage.removeItem("preferredLanguage");
+            // Clear all translation states
+            this.clearAllPersistentState();
+            
+            // Only reload if this was user-initiated (clicked by user)
+            if (userInitiated) {
+                console.log('🔄 User clicked English - reloading to original state');
+                window.location.reload();
+            } else {
+                console.log('🔄 System set English - not reloading');
+            }
+            return;
+        }
+        
+        // For other languages, save and reload
         localStorage.setItem("selectedLanguage", newLanguage);
+        sessionStorage.setItem("selectedLang", newLanguage);
+        localStorage.setItem("preferredLanguage", newLanguage);
         window.location.reload();
     }
     
     revertToOriginal() {
         console.log('🔄 Reverting page to original language...');
         
-        // Clear localStorage language setting and reload page like anuvadini
-        localStorage.removeItem("selectedLanguage");
-        sessionStorage.removeItem("selectedLang");
-        localStorage.removeItem("preferredLanguage");
-        
-        // Reload page to get original content
-        window.location.reload();
+        // Use handleLanguageChange with userInitiated=true since this is a user action
+        this.handleLanguageChange('en', true);
     }
     
     setupNavigationMonitoring() {
         console.log('🧭 Setting up navigation monitoring...');
-        // Simplified navigation monitoring - just reload page on language change
-        // This matches the anuvadini pattern of using window.location.reload()
+        
+        // Monitor for page navigation and trigger translation if needed
+        let lastUrl = window.location.href;
+        
+        // Check for navigation every 2 seconds
+        setInterval(() => {
+            const currentUrl = window.location.href;
+            if (currentUrl !== lastUrl) {
+                console.log('🧭 Page navigation detected:', lastUrl, '->', currentUrl);
+                lastUrl = currentUrl;
+                
+                // Check if we should translate this page
+                const currentLang = localStorage.getItem("selectedLanguage");
+                if (currentLang && currentLang !== "en-IN" && currentLang !== "en") {
+                    console.log('🔄 Navigation detected with translation language, triggering translation:', currentLang);
+                    // Delay to allow page to load
+                    setTimeout(() => {
+                        this.autoTranslatePage(currentLang);
+                    }, 1000);
+                }
+            }
+        }, 2000);
+        
         console.log('✅ Navigation monitoring setup complete');
     }
     
@@ -1176,6 +1194,16 @@ class TranslationEngine {
         // Create mutation observer that handles both anuvadini pattern and bhashini auto-translation
         this.mutationObserver = new MutationObserver((mutations) => {
             console.log('🔍 Mutation observer triggered with', mutations.length, 'mutations');
+            
+            // Check if we should be translating on this page
+            const currentLang = localStorage.getItem("selectedLanguage");
+            const shouldTranslate = currentLang && currentLang !== "en-IN" && currentLang !== "en";
+            
+            if (!shouldTranslate) {
+                console.log('⏭️ Skipping mutation processing - no translation needed');
+                return;
+            }
+            
             mutations.forEach((mutation) => {
                 if (mutation.type === 'childList') {
                     console.log('📝 childList mutation detected, added nodes:', mutation.addedNodes.length);
@@ -1191,13 +1219,21 @@ class TranslationEngine {
                             // Check for current language (like anuvadini does)
                             const currentLang = localStorage.getItem("selectedLanguage");
                             console.log('🌐 Current language from localStorage:', currentLang);
+                            
+                            // Only translate if we have a target language and the page should be translated
                             if (currentLang && currentLang !== "en-IN" && currentLang !== "en") {
-                                console.log('🔄 New content detected, translating to:', currentLang);
-                                // Update current target language if it changed
-                                if (this.currentTargetLanguage !== currentLang) {
-                                    this.currentTargetLanguage = currentLang;
+                                // Check if this element contains meaningful text that needs translation
+                                const elementText = addedNode.textContent?.trim();
+                                if (elementText && elementText.length > 10) { // Only process elements with substantial text
+                                    console.log('🔄 New content detected, translating to:', currentLang);
+                                    // Update current target language if it changed
+                                    if (this.currentTargetLanguage !== currentLang) {
+                                        this.currentTargetLanguage = currentLang;
+                                    }
+                                    this.translateNewElement(addedNode);
+                                } else {
+                                    console.log('⏭️ Skipping element - no meaningful text content');
                                 }
-                                this.translateNewElement(addedNode);
                             } else {
                                 console.log('❌ No translation needed - language is English or not set');
                             }
@@ -1243,6 +1279,7 @@ class TranslationEngine {
     async translateNewElement(element) {
         try {
             console.log('🎯 translateNewElement called for:', element.tagName, element.textContent?.substring(0, 50));
+            
             // Get text nodes from the new element
             const textNodes = this.dfsTraversal.getTextNodesToTranslate(element, {
                 enableCache: false,
@@ -1256,7 +1293,25 @@ class TranslationEngine {
                 // Add to debounce queue instead of immediate translation
                 this.addToDebounceQueue(textNodes);
             } else {
-                console.log('⚠️ No text nodes found in new element');
+                // If no text nodes found, try a deeper search for nested text
+                const allTextNodes = this.getTextNodes(element);
+                const meaningfulTextNodes = allTextNodes.filter(node => {
+                    const text = node.textContent?.trim();
+                    return text && text.length > 2; // Remove translation state check
+                });
+                
+                if (meaningfulTextNodes.length > 0) {
+                    console.log(`🔍 Found ${meaningfulTextNodes.length} meaningful text nodes in nested content`);
+                    // Convert to proper format and add to queue
+                    const formattedNodes = meaningfulTextNodes.map(node => ({
+                        type: "text",
+                        node: node,
+                        content: node.textContent
+                    }));
+                    this.addToDebounceQueue(formattedNodes);
+                } else {
+                    console.log('⚠️ No meaningful text nodes found in new element');
+                }
             }
         } catch (error) {
             console.error('❌ Error processing new element:', error);
@@ -1270,9 +1325,34 @@ class TranslationEngine {
             this.debounceTimer = null;
         }
         
-        // Add new text nodes to queue
-        this.debounceQueue.push(...textNodes);
-        console.log(`📝 Debounce queue now has ${this.debounceQueue.length} items`);
+        // Filter out whitespace-only text nodes and ensure proper format
+        const meaningfulNodes = textNodes.filter(node => {
+            const text = node.textContent || node.content || '';
+            const trimmedText = text.trim();
+            // Only include nodes with meaningful content (more than just whitespace/newlines)
+            return trimmedText.length > 0 && trimmedText.length > 2;
+        }).map(node => {
+            // Ensure all nodes have the proper format for batch processing
+            if (node.type && node.node && node.content) {
+                // Already properly formatted
+                return node;
+            } else {
+                // Convert raw DOM node to proper format
+                return {
+                    type: "text",
+                    node: node,
+                    content: node.textContent || node.content || ''
+                };
+            }
+        });
+        
+        if (meaningfulNodes.length > 0) {
+            // Add only meaningful text nodes to queue
+            this.debounceQueue.push(...meaningfulNodes);
+            console.log(`📝 Debounce queue now has ${this.debounceQueue.length} items (filtered ${textNodes.length - meaningfulNodes.length} whitespace nodes)`);
+        } else {
+            console.log(`📝 Skipped ${textNodes.length} whitespace-only text nodes`);
+        }
         
         // Clear existing timer
         if (this.debounceTimer) {
@@ -1373,12 +1453,7 @@ class TranslationEngine {
             window.selectLanguage = (language) => {
                 console.log(`🎯 Language selected via overlay: ${language}`);
                 
-                // Save to both localStorage and sessionStorage (like both utilities)
-                localStorage.setItem("selectedLanguage", language);
-                sessionStorage.setItem("selectedLang", language);
-                localStorage.setItem("preferredLanguage", language);
-                
-                // Trigger language change using our enhanced system
+                // Trigger language change using our enhanced system (handles English specially)
                 this.handleLanguageChange(language);
                 
                 // DON'T call original function - it bypasses our enhanced batching system
@@ -1394,12 +1469,7 @@ class TranslationEngine {
                 const language = target.getAttribute('data-lang');
                 console.log(`🎯 Language selected via overlay button: ${language}`);
                 
-                // Save to both localStorage and sessionStorage
-                localStorage.setItem("selectedLanguage", language);
-                sessionStorage.setItem("selectedLang", language);
-                localStorage.setItem("preferredLanguage", language);
-                
-                // Trigger language change
+                // Trigger language change (handles English specially)
                 this.handleLanguageChange(language);
             }
         });
@@ -1414,10 +1484,10 @@ class TranslationEngine {
             return { success: false, error: 'Translation already in progress' };
         }
         
-        if (this.currentTargetLanguage === targetLang) {
-            console.log('⚠️ Page already translated to this language, skipping...');
-            return { success: true, itemsTranslated: 0, message: 'Already translated' };
-        }
+        // Check if page is already translated by looking at actual DOM state, not just currentTargetLanguage
+        // Always translate - don't check for previous translation state
+        // since content reverts to English when navigating away
+        console.log('🔄 Starting translation regardless of previous state');
         
         // Save the target language to localStorage (like anuvadini does)
         console.log('💾 Saving target language to localStorage:', targetLang);
@@ -2089,6 +2159,7 @@ class OverlayComponent {
                 <div class="language-section">
                     <label for="language-select">Target Language:</label>
                     <select id="language-select" class="language-select">
+                        <option value="en">English (Original)</option>
                         <option value="hi">Hindi (हिन्दी)</option>
                         <option value="bn">Bengali (বাংলা)</option>
                         <option value="ta">Tamil (தமிழ்)</option>
@@ -2111,7 +2182,6 @@ class OverlayComponent {
                         <option value="mai">Maithili (मैथिली)</option>
                         <option value="mni">Manipuri (মণিপুরী)</option>
                         <option value="ne">Nepali (नेपाली)</option>
-                        <option value="en">English</option>
                     </select>
                 </div>
                 
@@ -2436,16 +2506,35 @@ console.log('💾 Translation states are automatically saved and restored!');
 setTimeout(() => {
     console.log('🔄 Global initialization starting...');
     console.log('🔍 Current localStorage selectedLanguage:', localStorage.getItem("selectedLanguage"));
+    console.log('🔍 Current sessionStorage selectedLang:', sessionStorage.getItem("selectedLang"));
+    console.log('🔍 Current localStorage preferredLanguage:', localStorage.getItem("preferredLanguage"));
+    
     translationEngine.initialize();
     
     // Always set up mutation observer and observe initial content
     translationEngine.observeInitialContent();
     
-    // Check for saved language and translate if needed
+    // Only auto-translate if explicitly requested by user (not on page load)
+    // Clear any stale language settings to prevent unwanted auto-translation
     const lang = localStorage.getItem("selectedLanguage");
     if (lang && lang !== "en-IN" && lang !== "en") {
-        console.log('🎯 Found saved language, starting auto-translation:', lang);
-        translationEngine.autoTranslatePage(lang);
+        // Check if this is a fresh page load (no translation state)
+        const hasTranslationState = localStorage.getItem(`translationState_${window.location.pathname}_${lang}`);
+        console.log('🔍 Translation state check:', `translationState_${window.location.pathname}_${lang}`, '=', hasTranslationState);
+        
+        if (!hasTranslationState) {
+            console.log('🧹 Clearing stale language setting - no translation state found');
+            localStorage.removeItem("selectedLanguage");
+            sessionStorage.removeItem("selectedLang");
+            localStorage.removeItem("preferredLanguage");
+        } else {
+            console.log('🎯 Found saved language with translation state, starting auto-translation:', lang);
+            translationEngine.autoTranslatePage(lang);
+        }
+    } else if (lang === "en" || lang === "en-IN") {
+        console.log('ℹ️ English selected - page should be in original state');
+        // Clear any translation state if English is selected (system-initiated, no reload)
+        translationEngine.handleLanguageChange(lang, false);
     } else {
         console.log('ℹ️ No saved language found, mutation observer will be ready for future language selection');
     }
@@ -2453,18 +2542,9 @@ setTimeout(() => {
 
 // Auto-initialize when DOM is ready (following anuvadini pattern)
 document.addEventListener("DOMContentLoaded", () => {
-    const lang = localStorage.getItem("selectedLanguage");
-    if (!lang || lang === "en-IN") {
-        setTimeout(() => {
-            translationEngine.observeInitialContent();
-        }, 5000);
-    } else {
-        setTimeout(() => {
-            translationEngine.observeInitialContent();
-            // Start translation if language is set
-            if (lang && lang !== "en-IN" && lang !== "en") {
-                translationEngine.autoTranslatePage(lang);
-            }
-        }, 5000);
-    }
+    console.log('📄 DOMContentLoaded - setting up initial content observation');
+    // Only observe initial content here - auto-translation is handled by global setTimeout
+    setTimeout(() => {
+        translationEngine.observeInitialContent();
+    }, 5000);
 });
