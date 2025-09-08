@@ -18,18 +18,19 @@
 // Modify these values to customize the behavior and performance of the translation system.
 // ============================================================================
 
-// Batch Processing Configuration - OPTIMIZED FOR MAXIMUM SPEED
-const BATCH_SIZE = 50;                    // Larger batches = fewer API calls = faster overall
-const MAX_BATCH_SIZE = 50;                // Hard limit for batch size
-const BATCH_SIZE_LONG_TEXT = 40;          // Larger batches for all text types
-const BATCH_SIZE_MEDIUM_TEXT = 45;        // Larger batches for all text types
-const BATCH_SIZE_SHORT_TEXT = 50;         // Maximum batch size for short text
-const BATCH_DELAY_MS = 10;                // Minimal delay between batches
+// Batch Processing Configuration - OPTIMIZED FOR CONCURRENT API CALLS
+const BATCH_SIZE = 25;                    // Smaller batches for concurrent processing
+const MAX_BATCH_SIZE = 25;                // Hard limit for batch size
+const BATCH_SIZE_LONG_TEXT = 20;          // Smaller batches for concurrent processing
+const BATCH_SIZE_MEDIUM_TEXT = 22;        // Smaller batches for concurrent processing
+const BATCH_SIZE_SHORT_TEXT = 25;         // Smaller batches for concurrent processing
+const MAX_CONCURRENT_BATCHES = 4;         // Maximum concurrent API calls
+const BATCH_DELAY_MS = 0;                 // No delay - concurrent processing
 
-// Debouncing Configuration - OPTIMIZED FOR MAXIMUM SPEED
-const DEBOUNCE_DELAY_MS = 200;            // Much faster debounce
-const DEBOUNCE_QUEUE_THRESHOLD = 10;      // Process smaller queues immediately
-const DEBOUNCE_MAX_WAIT_MS = 1000;        // Much shorter max wait time
+// Debouncing Configuration - OPTIMIZED FOR CONCURRENT PROCESSING
+const DEBOUNCE_DELAY_MS = 100;            // Very fast debounce for concurrent processing
+const DEBOUNCE_QUEUE_THRESHOLD = 5;       // Process very small queues immediately
+const DEBOUNCE_MAX_WAIT_MS = 500;         // Very short max wait time
 
 // Timing Configuration - OPTIMIZED FOR MAXIMUM SPEED
 const INITIALIZATION_DELAY_MS = 500;      // Start much faster
@@ -54,6 +55,10 @@ const SHORT_TEXT_THRESHOLD = 15;          // Lower threshold = more items in lar
 // Translation Detection
 const TRANSLATION_RATIO_THRESHOLD = 0.5;  // Ratio of non-Latin characters to consider translated
 const CONTENT_HASH_LENGTH = 20;           // Length of content hash for state management
+
+// Already Translated Content Detection
+const SKIP_ALREADY_TRANSLATED = true;     // Skip content that appears already translated
+const MIN_TRANSLATION_CHANGE_RATIO = 0.1; // Minimum 10% change to consider it a real translation
 
 // Caching Configuration
 const CACHE_MAX_SIZE = 10000;             // Maximum cache size
@@ -375,7 +380,8 @@ class DFSTraversal {
         const {
             maxDepth = MAX_DOM_DEPTH,
             enableCache = true,
-            enableAdvancedFiltering = CONFIG.ENABLE_ADVANCED_FILTERING
+            enableAdvancedFiltering = CONFIG.ENABLE_ADVANCED_FILTERING,
+            targetLanguage = null
         } = options;
         
         // Check cache first
@@ -403,7 +409,7 @@ class DFSTraversal {
                 const text = node.textContent;
                 if (text && !this.isIgnoredNode(node, enableAdvancedFiltering)) {
                     // Check if this element has already been translated
-                    if (!this.isElementAlreadyTranslated(node, text)) {
+                    if (!this.isElementAlreadyTranslated(node, text, targetLanguage)) {
                     translatableContent.push({
                         type: "text",
                         node: node,
@@ -622,16 +628,93 @@ class DFSTraversal {
         };
     }
     
-    isElementAlreadyTranslated(node, text) {
-        // Don't check element translation state - always process since content reverts to English
+    isElementAlreadyTranslated(node, text, targetLanguage = null) {
+        if (!SKIP_ALREADY_TRANSLATED) {
+            return false;
+        }
         
-        // Don't check translation state - always process since content reverts to English
+        const trimmedText = text.trim();
+        if (trimmedText.length < 3) {
+            return false;
+        }
         
-        // Check if the text appears to be already translated (non-Latin characters)
-        if (text.trim().length > 3 && REGEX_PATTERNS.unicode.test(text.trim())) {
-            // This might be already translated content, but we need to be careful
-            // Only skip if we're sure it's not original content
-            return false; // Let the translation engine decide
+        // Check if text contains non-Latin characters (likely already translated)
+        if (REGEX_PATTERNS.unicode.test(trimmedText)) {
+            // If we have a target language, check if content is already in that language
+            if (targetLanguage) {
+                const isInTargetLanguage = this.isContentInTargetLanguage(trimmedText, targetLanguage);
+                if (isInTargetLanguage) {
+                    console.log(`🚫 Skipping already translated content: "${trimmedText.substring(0, 30)}..."`);
+                    return true;
+                }
+                // If content is in a different language (not target), allow translation
+                return false;
+            }
+            
+            // Fallback: Check if this looks like Hindi/Indian script content
+            if (/[\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0D80-\u0DFF]/.test(trimmedText)) {
+                console.log(`🚫 Skipping already translated content: "${trimmedText.substring(0, 30)}..."`);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    isContentAlreadyTranslated(text, targetLanguage = null) {
+        if (!SKIP_ALREADY_TRANSLATED) {
+            return false;
+        }
+        
+        const trimmedText = text.trim();
+        if (trimmedText.length < 3) {
+            return false;
+        }
+        
+        // Check if text contains non-Latin characters (likely already translated)
+        if (REGEX_PATTERNS.unicode.test(trimmedText)) {
+            // If we have a target language, check if content is already in that language
+            if (targetLanguage) {
+                return this.isContentInTargetLanguage(trimmedText, targetLanguage);
+            }
+            
+            // Fallback: Check if this looks like Hindi/Indian script content
+            if (/[\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0D80-\u0DFF]/.test(trimmedText)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    isContentInTargetLanguage(text, targetLanguage) {
+        // Define language-specific Unicode ranges
+        const languageRanges = {
+            'hi': /[\u0900-\u097F]/, // Devanagari (Hindi)
+            'bn': /[\u0980-\u09FF]/, // Bengali
+            'gu': /[\u0A80-\u0AFF]/, // Gujarati
+            'pa': /[\u0A00-\u0A7F]/, // Gurmukhi (Punjabi)
+            'or': /[\u0B00-\u0B7F]/, // Oriya
+            'ta': /[\u0B80-\u0BFF]/, // Tamil
+            'te': /[\u0C00-\u0C7F]/, // Telugu
+            'kn': /[\u0C80-\u0CFF]/, // Kannada
+            'ml': /[\u0D00-\u0D7F]/, // Malayalam
+            'ks': /[\u0600-\u06FF\u0750-\u077F]/, // Arabic script (Kashmiri)
+            'ur': /[\u0600-\u06FF\u0750-\u077F]/, // Arabic script (Urdu)
+            'ar': /[\u0600-\u06FF\u0750-\u077F]/, // Arabic
+            'fa': /[\u0600-\u06FF\u0750-\u077F]/, // Persian
+            'zh': /[\u4E00-\u9FFF]/, // Chinese
+            'ja': /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/, // Japanese
+            'ko': /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/, // Korean
+            'th': /[\u0E00-\u0E7F]/, // Thai
+            'ru': /[\u0400-\u04FF]/, // Cyrillic (Russian)
+            'el': /[\u0370-\u03FF]/, // Greek
+            'he': /[\u0590-\u05FF]/, // Hebrew
+        };
+        
+        const targetRange = languageRanges[targetLanguage];
+        if (targetRange && targetRange.test(text)) {
+            return true;
         }
         
         return false;
@@ -640,10 +723,11 @@ class DFSTraversal {
 
 // Batch processor
 class BatchProcessor {
-    constructor() {
+    constructor(dfsTraversal = null) {
         this.batchQueue = [];
         this.isProcessingBatch = false;
         this.performanceMonitor = new PerformanceMonitor();
+        this.dfsTraversal = dfsTraversal;
     }
     
     createSmartBatches(textNodes) {
@@ -732,66 +816,73 @@ class BatchProcessor {
         const batches = this.createSmartBatches(textNodes);
         const results = [];
         
-        console.log(`🚀 Starting progressive translation: ${batches.length} batches`);
+        console.log(`🚀 Starting CONCURRENT translation: ${batches.length} batches`);
         console.log(`🔍 DEBUG: Batch sizes:`, batches.map(batch => batch.length));
+        console.log(`⚡ Max concurrent batches: ${MAX_CONCURRENT_BATCHES}`);
         
         if (sourceLang) {
             console.log(`📝 Source language: ${sourceLang} → Target language: ${targetLang}`);
         }
         
-        for (let i = 0; i < batches.length; i++) {
-            const batch = batches[i];
-            const batchStartTime = performance.now();
+        // Process batches concurrently in chunks
+        const concurrentChunks = [];
+        for (let i = 0; i < batches.length; i += MAX_CONCURRENT_BATCHES) {
+            concurrentChunks.push(batches.slice(i, i + MAX_CONCURRENT_BATCHES));
+        }
+        
+        console.log(`📦 Processing ${concurrentChunks.length} concurrent chunks`);
+        
+        for (let chunkIndex = 0; chunkIndex < concurrentChunks.length; chunkIndex++) {
+            const chunk = concurrentChunks[chunkIndex];
+            const chunkStartTime = performance.now();
             
-            console.log(`\n📦 ===== BATCH ${i + 1}/${batches.length} START =====`);
-            console.log(`📊 Batch Size: ${batch.length} items`);
-            console.log(`🎯 Target Language: ${targetLang}`);
-            console.log(`🌍 Source Language: ${sourceLang || 'auto'}`);
-            console.log(`⏰ Batch Start Time: ${new Date().toISOString()}`);
+            console.log(`\n⚡ ===== CONCURRENT CHUNK ${chunkIndex + 1}/${concurrentChunks.length} START =====`);
+            console.log(`📊 Chunk contains ${chunk.length} batches`);
+            console.log(`⏰ Chunk Start Time: ${new Date().toISOString()}`);
             
-            // Log sample of batch content
-            console.log(`📝 Batch Content Sample (first ${LOG_SAMPLE_SIZE} items):`);
-            batch.slice(0, LOG_SAMPLE_SIZE).forEach((item, index) => {
-                console.log(`   ${index + 1}. "${item.content.substring(0, SAMPLE_TEXT_LENGTH)}${item.content.length > SAMPLE_TEXT_LENGTH ? '...' : ''}"`);
+            // Process all batches in this chunk concurrently
+            const chunkPromises = chunk.map(async (batch, batchIndex) => {
+                const globalBatchIndex = chunkIndex * MAX_CONCURRENT_BATCHES + batchIndex;
+                const batchStartTime = performance.now();
+                
+                console.log(`🔄 Starting concurrent batch ${globalBatchIndex + 1}/${batches.length} (${batch.length} items)`);
+                
+                try {
+                    const batchResult = await this.translateBatch(batch, targetLang, sourceLang);
+                    
+                    const batchTime = performance.now() - batchStartTime;
+                    const successCount = batchResult.filter(r => r.translated).length;
+                    
+                    console.log(`✅ Batch ${globalBatchIndex + 1} completed in ${batchTime.toFixed(2)}ms (${successCount} translated)`);
+                    
+                    // Real-time DOM updates as each batch completes
+                    if (onBatchComplete) {
+                        onBatchComplete({
+                            batchIndex: globalBatchIndex,
+                            totalBatches: batches.length,
+                            batchResult: batchResult,
+                            successCount: successCount,
+                            batchTime: batchTime,
+                            progress: ((globalBatchIndex + 1) / batches.length) * 100,
+                            concurrent: true
+                        });
+                    }
+                    
+                    return batchResult;
+                } catch (error) {
+                    console.error(`❌ Error in concurrent batch ${globalBatchIndex + 1}:`, error);
+                    return batch.map(item => ({ ...item, translated: false, success: false, error: error.message }));
+                }
             });
-            if (batch.length > LOG_SAMPLE_SIZE) {
-                console.log(`   ... and ${batch.length - LOG_SAMPLE_SIZE} more items in this batch`);
-            }
             
-            try {
-                console.log(`🔄 Calling translateBatch for batch ${i + 1}...`);
-                const batchResult = await this.translateBatch(batch, targetLang, sourceLang);
-                results.push(...batchResult);
-                
-                const batchTime = performance.now() - batchStartTime;
-                const successCount = batchResult.filter(r => r.translated).length;
-                
-                console.log(`✅ ===== BATCH ${i + 1} COMPLETED =====`);
-                console.log(`⏱️ Batch Time: ${batchTime.toFixed(2)}ms`);
-                console.log(`📊 Results: ${batchResult.length} items processed`);
-                console.log(`✅ Successful: ${successCount} items`);
-                console.log(`⏭️ Skipped: ${batchResult.length - successCount} items`);
-                
-                // Progressive rendering: Update UI immediately after each batch
-                if (onBatchComplete) {
-                    onBatchComplete({
-                        batchIndex: i,
-                        totalBatches: batches.length,
-                        batchResult: batchResult,
-                        successCount: successCount,
-                        batchTime: batchTime,
-                        progress: ((i + 1) / batches.length) * 100
-                    });
-                }
-                
-                // Small delay between batches to prevent overwhelming the API
-                if (i < batches.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-                }
-            } catch (error) {
-                console.error(`❌ Error processing batch ${i + 1}:`, error);
-                // Continue with next batch
-            }
+            // Wait for all batches in this chunk to complete
+            const chunkResults = await Promise.all(chunkPromises);
+            results.push(...chunkResults.flat());
+            
+            const chunkTime = performance.now() - chunkStartTime;
+            console.log(`⚡ ===== CONCURRENT CHUNK ${chunkIndex + 1} COMPLETED =====`);
+            console.log(`⏱️ Chunk Time: ${chunkTime.toFixed(2)}ms`);
+            console.log(`📊 Processed ${chunk.length} batches concurrently`);
         }
         
         this.performanceMonitor.endTimer('translation', startTime);
@@ -802,16 +893,17 @@ class BatchProcessor {
         const totalSuccessful = results.filter(r => r.success).length;
         const totalTime = performance.now() - startTime;
         
-        console.log(`\n🎉 ===== TRANSLATION COMPLETE =====`);
+        console.log(`\n🎉 ===== CONCURRENT TRANSLATION COMPLETE =====`);
         console.log(`📊 Total Items: ${textNodes.length}`);
         console.log(`✅ Successfully Translated: ${totalTranslated}`);
         console.log(`⏭️ Skipped (Already Translated): ${totalSkipped}`);
         console.log(`✅ Successful API Calls: ${totalSuccessful}`);
         console.log(`⏱️ Total Time: ${totalTime.toFixed(2)}ms`);
         console.log(`📦 Total Batches: ${batches.length}`);
+        console.log(`⚡ Concurrent Chunks: ${concurrentChunks.length}`);
         console.log(`🌍 Source Language: ${sourceLang || 'auto'}`);
         console.log(`🎯 Target Language: ${targetLang}`);
-        console.log(`🎉 ===== TRANSLATION COMPLETE =====\n`);
+        console.log(`🎉 ===== CONCURRENT TRANSLATION COMPLETE =====\n`);
         
         return results;
     }
@@ -822,10 +914,14 @@ class BatchProcessor {
         console.log(`🎯 Target: ${targetLang}`);
         console.log(`🌍 Source: ${sourceLang || 'auto'}`);
         
-        // Process all text nodes - don't filter by translation state
-        // since content reverts to English when navigating away
-        console.log(`🔍 Processing all text nodes for translation...`);
-        const untranslatedNodes = textNodes;
+        // Filter out already translated content
+        const untranslatedNodes = textNodes.filter(node => {
+            const isAlreadyTranslated = this.isContentAlreadyTranslated(node.content, targetLang);
+            if (isAlreadyTranslated) {
+                console.log(`🚫 Skipping already translated: "${node.content.substring(0, 30)}..."`);
+            }
+            return !isAlreadyTranslated;
+        });
         
         console.log(`📊 Filtering Results:`);
         console.log(`   📝 Total items in batch: ${textNodes.length}`);
@@ -862,11 +958,32 @@ class BatchProcessor {
             // Map results back to original textNodes array
             let resultIndex = 0;
             return textNodes.map(item => {
-                // Always translate - don't check translation state
-                // since content reverts to English when navigating away
+                // Check if this item was filtered out (already translated)
+                const wasFiltered = !untranslatedNodes.includes(item);
+                if (wasFiltered) {
+                    return { ...item, translated: true, translation: item.content, success: true, skipped: true };
+                }
+                
+                // Process translation result
                 if (resultIndex < translations.length) {
                     const translation = translations[resultIndex++];
                     if (translation && translation.target) {
+                        // Check if translation actually changed the content
+                        const originalText = item.content.trim();
+                        const translatedText = translation.target.trim();
+                        
+                        if (originalText === translatedText) {
+                            console.log(`🚫 API returned same text, skipping: "${originalText.substring(0, 30)}..."`);
+                            return { ...item, translated: true, translation: item.content, success: true, skipped: true };
+                        }
+                        
+                        // Check if translation has meaningful change (at least 10% different)
+                        const changeRatio = this.calculateTextChangeRatio(originalText, translatedText);
+                        if (changeRatio < MIN_TRANSLATION_CHANGE_RATIO) {
+                            console.log(`🚫 Translation change too small (${(changeRatio * 100).toFixed(1)}%), skipping: "${originalText.substring(0, 30)}..."`);
+                            return { ...item, translated: true, translation: item.content, success: true, skipped: true };
+                        }
+                        
                         this.updateDOMNode(item, translation.target);
                         return { ...item, translated: true, translation: translation.target, success: true };
                     }
@@ -1003,6 +1120,109 @@ class BatchProcessor {
             console.error('Error updating DOM node:', error);
         }
     }
+    
+    calculateTextChangeRatio(originalText, translatedText) {
+        if (originalText === translatedText) {
+            return 0;
+        }
+        
+        // Simple character-based change ratio
+        const maxLength = Math.max(originalText.length, translatedText.length);
+        if (maxLength === 0) {
+            return 0;
+        }
+        
+        // Calculate Levenshtein distance for more accurate change detection
+        const distance = this.levenshteinDistance(originalText, translatedText);
+        return distance / maxLength;
+    }
+    
+    levenshteinDistance(str1, str2) {
+        const matrix = [];
+        
+        for (let i = 0; i <= str2.length; i++) {
+            matrix[i] = [i];
+        }
+        
+        for (let j = 0; j <= str1.length; j++) {
+            matrix[0][j] = j;
+        }
+        
+        for (let i = 1; i <= str2.length; i++) {
+            for (let j = 1; j <= str1.length; j++) {
+                if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+        
+        return matrix[str2.length][str1.length];
+    }
+    
+    isContentAlreadyTranslated(text, targetLanguage = null) {
+        if (!SKIP_ALREADY_TRANSLATED) {
+            return false;
+        }
+        
+        const trimmedText = text.trim();
+        if (trimmedText.length < 3) {
+            return false;
+        }
+        
+        // Check if text contains non-Latin characters (likely already translated)
+        if (REGEX_PATTERNS.unicode.test(trimmedText)) {
+            // If we have a target language, check if content is already in that language
+            if (targetLanguage) {
+                return this.isContentInTargetLanguage(trimmedText, targetLanguage);
+            }
+            
+            // Fallback: Check if this looks like Hindi/Indian script content
+            if (/[\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0A80-\u0AFF\u0B00-\u0B7F\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0D80-\u0DFF]/.test(trimmedText)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    isContentInTargetLanguage(text, targetLanguage) {
+        // Define language-specific Unicode ranges
+        const languageRanges = {
+            'hi': /[\u0900-\u097F]/, // Devanagari (Hindi)
+            'bn': /[\u0980-\u09FF]/, // Bengali
+            'gu': /[\u0A80-\u0AFF]/, // Gujarati
+            'pa': /[\u0A00-\u0A7F]/, // Gurmukhi (Punjabi)
+            'or': /[\u0B00-\u0B7F]/, // Oriya
+            'ta': /[\u0B80-\u0BFF]/, // Tamil
+            'te': /[\u0C00-\u0C7F]/, // Telugu
+            'kn': /[\u0C80-\u0CFF]/, // Kannada
+            'ml': /[\u0D00-\u0D7F]/, // Malayalam
+            'ks': /[\u0600-\u06FF\u0750-\u077F]/, // Arabic script (Kashmiri)
+            'ur': /[\u0600-\u06FF\u0750-\u077F]/, // Arabic script (Urdu)
+            'ar': /[\u0600-\u06FF\u0750-\u077F]/, // Arabic
+            'fa': /[\u0600-\u06FF\u0750-\u077F]/, // Persian
+            'zh': /[\u4E00-\u9FFF]/, // Chinese
+            'ja': /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/, // Japanese
+            'ko': /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/, // Korean
+            'th': /[\u0E00-\u0E7F]/, // Thai
+            'ru': /[\u0400-\u04FF]/, // Cyrillic (Russian)
+            'el': /[\u0370-\u03FF]/, // Greek
+            'he': /[\u0590-\u05FF]/, // Hebrew
+        };
+        
+        const targetRange = languageRanges[targetLanguage];
+        if (targetRange && targetRange.test(text)) {
+            return true;
+        }
+        
+        return false;
+    }
 }
 
 
@@ -1010,7 +1230,7 @@ class BatchProcessor {
 class TranslationEngine {
     constructor() {
         this.dfsTraversal = new DFSTraversal();
-        this.batchProcessor = new BatchProcessor();
+        this.batchProcessor = new BatchProcessor(this.dfsTraversal);
         this.performanceMonitor = new PerformanceMonitor();
         this.stateManager = new StateManager();
         this.isInitialized = false;
@@ -1040,12 +1260,13 @@ class TranslationEngine {
                 if (entry.isIntersecting) {
                     const node = entry.target;
                     // Use getTextNodesToTranslate to get properly formatted text nodes
+                    const currentLang = localStorage.getItem("selectedLanguage");
                     const textNodes = this.dfsTraversal.getTextNodesToTranslate(node, {
                         enableCache: false,
-                        enableAdvancedFiltering: true
+                        enableAdvancedFiltering: true,
+                        targetLanguage: currentLang
                     });
                     // Process text nodes directly - check current language dynamically
-                    const currentLang = localStorage.getItem("selectedLanguage");
                     if (textNodes.length > 0 && currentLang && currentLang !== "en-IN" && currentLang !== "en") {
                         console.log(`👁️ Intersection observer found ${textNodes.length} text nodes, translating to:`, currentLang);
                         // Update current target language if it changed
@@ -1145,9 +1366,11 @@ class TranslationEngine {
     observeInitialContent() {
         try {
             // Use getTextNodesToTranslate to get properly formatted text nodes
+            const currentLang = localStorage.getItem("selectedLanguage");
             const textNodes = this.dfsTraversal.getTextNodesToTranslate(document.body, {
                 enableCache: false,
-                enableAdvancedFiltering: true
+                enableAdvancedFiltering: true,
+                targetLanguage: currentLang
             });
             
             textNodes.forEach((textNodeData) => {
@@ -1384,9 +1607,11 @@ class TranslationEngine {
             console.log('🎯 translateNewElement called for:', element.tagName, element.textContent?.substring(0, SAMPLE_TEXT_LENGTH));
             
             // Get text nodes from the new element
+            const currentLang = localStorage.getItem("selectedLanguage");
             const textNodes = this.dfsTraversal.getTextNodesToTranslate(element, {
                 enableCache: false,
-                enableAdvancedFiltering: true
+                enableAdvancedFiltering: true,
+                targetLanguage: currentLang
             });
             
             console.log(`🔍 Found ${textNodes.length} text nodes in new element`);
@@ -1655,7 +1880,8 @@ class TranslationEngine {
             // Get all text nodes using enhanced DFS traversal
             const textNodes = this.dfsTraversal.getTextNodesToTranslate(document.body, {
                 enableCache: true,
-                enableAdvancedFiltering: true
+                enableAdvancedFiltering: true,
+                targetLanguage: targetLang
             });
             
             console.log(`📊 Found ${textNodes.length} translatable items`);
