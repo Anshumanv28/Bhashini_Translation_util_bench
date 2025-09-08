@@ -10,25 +10,92 @@
  * - Direct API calls with enhanced batching
  */
 
-// Configuration
+// ============================================================================
+// PERFORMANCE CONFIGURATION SECTION
+// ============================================================================
+// 
+// This section contains all configurable performance parameters for the Enhanced Bhashini Utility.
+// Modify these values to customize the behavior and performance of the translation system.
+// ============================================================================
+
+// Batch Processing Configuration - OPTIMIZED FOR MAXIMUM SPEED
+const BATCH_SIZE = 50;                    // Larger batches = fewer API calls = faster overall
+const MAX_BATCH_SIZE = 50;                // Hard limit for batch size
+const BATCH_SIZE_LONG_TEXT = 40;          // Larger batches for all text types
+const BATCH_SIZE_MEDIUM_TEXT = 45;        // Larger batches for all text types
+const BATCH_SIZE_SHORT_TEXT = 50;         // Maximum batch size for short text
+const BATCH_DELAY_MS = 10;                // Minimal delay between batches
+
+// Debouncing Configuration - OPTIMIZED FOR MAXIMUM SPEED
+const DEBOUNCE_DELAY_MS = 200;            // Much faster debounce
+const DEBOUNCE_QUEUE_THRESHOLD = 10;      // Process smaller queues immediately
+const DEBOUNCE_MAX_WAIT_MS = 1000;        // Much shorter max wait time
+
+// Timing Configuration - OPTIMIZED FOR MAXIMUM SPEED
+const INITIALIZATION_DELAY_MS = 500;      // Start much faster
+const NAVIGATION_CHECK_INTERVAL_MS = 500; // Check navigation more frequently
+const NAVIGATION_TRANSLATION_DELAY_MS = 200; // Minimal delay for navigation translation
+const DOM_CONTENT_DELAY_MS = 1000;        // Much faster DOM content observation
+
+// Text Processing Configuration - OPTIMIZED FOR MAXIMUM SPEED
+const MAX_DOM_DEPTH = 500;                // Reduced depth for faster traversal
+const MIN_TEXT_LENGTH = 1;                // Lower threshold = more items processed
+const MEANINGFUL_TEXT_LENGTH = 5;         // Lower threshold = faster processing
+const SAMPLE_TEXT_LENGTH = 30;            // Shorter samples = faster logging
+const LOG_SAMPLE_SIZE = 2;                // Fewer samples = faster logging
+const LANGUAGE_DETECTION_SAMPLE_SIZE = 3; // Smaller sample = faster detection
+const CONTENT_ANALYSIS_SAMPLE_SIZE = 5;   // Smaller sample = faster analysis
+
+// Text Length Thresholds - OPTIMIZED FOR MAXIMUM SPEED
+const LONG_TEXT_THRESHOLD = 80;           // Lower threshold = more items in larger batches
+const MEDIUM_TEXT_THRESHOLD = 40;         // Lower threshold = more items in larger batches
+const SHORT_TEXT_THRESHOLD = 15;          // Lower threshold = more items in larger batches
+
+// Translation Detection
+const TRANSLATION_RATIO_THRESHOLD = 0.5;  // Ratio of non-Latin characters to consider translated
+const CONTENT_HASH_LENGTH = 20;           // Length of content hash for state management
+
+// Caching Configuration
+const CACHE_MAX_SIZE = 10000;             // Maximum cache size
+
+// State Management Configuration
+const STATE_STORAGE_KEY = 'enhanced_bhashini_translation_state';
+const STATE_EXPIRY_HOURS = 24;
+
+// UI Configuration
+const OVERLAY_WIDTH = 350;                // Overlay width in pixels
+const OVERLAY_TOGGLE_SIZE = 50;           // Toggle button size in pixels
+const OVERLAY_POSITION_TOP = 20;          // Top position in pixels
+const OVERLAY_POSITION_RIGHT = 20;        // Right position in pixels
+const OVERLAY_BORDER_RADIUS = 12;         // Border radius in pixels
+const OVERLAY_TOGGLE_BORDER_RADIUS = 50;  // Toggle button border radius
+
+// Feature Flags
+const ENABLE_ADVANCED_FILTERING = true;
+const ENABLE_SMART_BATCHING = true;
+
+// API Configuration
+const API_BASE_URL = "https://translation-plugin.bhashini.co.in/";
+
+// Legacy CONFIG object for backward compatibility
 const CONFIG = {
     // API Configuration
-    API_BASE_URL: "https://translation-plugin.bhashini.co.in/",
+    API_BASE_URL: API_BASE_URL,
     
     // Performance Configuration
-  BATCH_SIZE: 50,
-    MAX_BATCH_SIZE: 100,
+    BATCH_SIZE: BATCH_SIZE,
+    MAX_BATCH_SIZE: MAX_BATCH_SIZE,
     
     // Caching Configuration
-    CACHE_MAX_SIZE: 10000,
+    CACHE_MAX_SIZE: CACHE_MAX_SIZE,
   
-  // State Management Configuration
-  STATE_STORAGE_KEY: 'enhanced_bhashini_translation_state',
-  STATE_EXPIRY_HOURS: 24,
+    // State Management Configuration
+    STATE_STORAGE_KEY: STATE_STORAGE_KEY,
+    STATE_EXPIRY_HOURS: STATE_EXPIRY_HOURS,
     
     // Feature Flags
-    ENABLE_ADVANCED_FILTERING: true,
-  ENABLE_SMART_BATCHING: true,
+    ENABLE_ADVANCED_FILTERING: ENABLE_ADVANCED_FILTERING,
+    ENABLE_SMART_BATCHING: ENABLE_SMART_BATCHING,
 };
 
 
@@ -96,7 +163,7 @@ class StateManager {
         // Create a unique key for the current page
         const pathname = window.location.pathname;
         const search = window.location.search;
-        return btoa(pathname + search).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+        return btoa(pathname + search).replace(/[^a-zA-Z0-9]/g, '').substring(0, CONTENT_HASH_LENGTH);
     }
     
     saveTranslationState(pageKey, targetLang, translatedNodes) {
@@ -306,7 +373,7 @@ class DFSTraversal {
         const startTime = this.performanceMonitor.startTimer('domTraversal');
         
         const {
-            maxDepth = 1000,
+            maxDepth = MAX_DOM_DEPTH,
             enableCache = true,
             enableAdvancedFiltering = CONFIG.ENABLE_ADVANCED_FILTERING
         } = options;
@@ -613,13 +680,13 @@ class BatchProcessor {
         console.log(`📊 Input: ${textNodes.length} text nodes`);
         
         if (textNodes.length === 0) {
-            console.log(`📊 No text nodes, returning default batch size: 50`);
+            console.log(`📊 No text nodes, returning default batch size: ${BATCH_SIZE}`);
             console.log(`🔍 ===== CALCULATE BATCH SIZE COMPLETE =====\n`);
-            return 50;
+            return BATCH_SIZE;
         }
         
-        // FIXED: Set maximum batch size to 50 items as requested
-        const maxBatchSize = 50;
+        // FIXED: Set maximum batch size to configured value
+        const maxBatchSize = MAX_BATCH_SIZE;
         console.log(`📊 Maximum batch size: ${maxBatchSize}`);
         
         const avgTextLength = textNodes.reduce((sum, node) => {
@@ -632,17 +699,17 @@ class BatchProcessor {
         // Adjust batch size based on text complexity
         let optimalBatchSize = maxBatchSize;
         
-        if (avgTextLength > 100) {
+        if (avgTextLength > LONG_TEXT_THRESHOLD) {
             // Long text takes more processing time, use smaller batches
-            optimalBatchSize = 30; // Smaller for long text
+            optimalBatchSize = BATCH_SIZE_LONG_TEXT;
             console.log(`📊 Long text detected, using smaller batch size: ${optimalBatchSize}`);
-        } else if (avgTextLength > 50) {
+        } else if (avgTextLength > MEDIUM_TEXT_THRESHOLD) {
             // Medium text, moderate batch size
-            optimalBatchSize = 40; // Medium for medium text
+            optimalBatchSize = BATCH_SIZE_MEDIUM_TEXT;
             console.log(`📊 Medium text detected, using medium batch size: ${optimalBatchSize}`);
-        } else if (avgTextLength > 20) {
+        } else if (avgTextLength > SHORT_TEXT_THRESHOLD) {
             // Short text, can handle larger batches
-            optimalBatchSize = 50; // Max for short text
+            optimalBatchSize = BATCH_SIZE_SHORT_TEXT;
             console.log(`📊 Short text detected, using max batch size: ${optimalBatchSize}`);
         }
         
@@ -683,12 +750,12 @@ class BatchProcessor {
             console.log(`⏰ Batch Start Time: ${new Date().toISOString()}`);
             
             // Log sample of batch content
-            console.log(`📝 Batch Content Sample (first 3 items):`);
-            batch.slice(0, 3).forEach((item, index) => {
-                console.log(`   ${index + 1}. "${item.content.substring(0, 50)}${item.content.length > 50 ? '...' : ''}"`);
+            console.log(`📝 Batch Content Sample (first ${LOG_SAMPLE_SIZE} items):`);
+            batch.slice(0, LOG_SAMPLE_SIZE).forEach((item, index) => {
+                console.log(`   ${index + 1}. "${item.content.substring(0, SAMPLE_TEXT_LENGTH)}${item.content.length > SAMPLE_TEXT_LENGTH ? '...' : ''}"`);
             });
-            if (batch.length > 3) {
-                console.log(`   ... and ${batch.length - 3} more items in this batch`);
+            if (batch.length > LOG_SAMPLE_SIZE) {
+                console.log(`   ... and ${batch.length - LOG_SAMPLE_SIZE} more items in this batch`);
             }
             
             try {
@@ -719,7 +786,7 @@ class BatchProcessor {
                 
                 // Small delay between batches to prevent overwhelming the API
                 if (i < batches.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay for faster UX
+                    await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
                 }
             } catch (error) {
                 console.error(`❌ Error processing batch ${i + 1}:`, error);
@@ -829,12 +896,12 @@ class BatchProcessor {
             console.log(`🔗 API Endpoint: ${window.TRANSLATION_PLUGIN_API_BASE_URL || 'https://translation-plugin.bhashini.co.in'}/v2/translate-text`);
             
             // Log sample of texts being sent
-            console.log(`📝 Sample Texts (first 3):`);
-            texts.slice(0, 3).forEach((text, index) => {
-                console.log(`   ${index + 1}. "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+            console.log(`📝 Sample Texts (first ${LOG_SAMPLE_SIZE}):`);
+            texts.slice(0, LOG_SAMPLE_SIZE).forEach((text, index) => {
+                console.log(`   ${index + 1}. "${text.substring(0, SAMPLE_TEXT_LENGTH)}${text.length > SAMPLE_TEXT_LENGTH ? '...' : ''}"`);
             });
-            if (texts.length > 3) {
-                console.log(`   ... and ${texts.length - 3} more items`);
+            if (texts.length > LOG_SAMPLE_SIZE) {
+                console.log(`   ... and ${texts.length - LOG_SAMPLE_SIZE} more items`);
             }
             
             // Make direct API call to Bhashini (not using original utility)
@@ -879,10 +946,10 @@ class BatchProcessor {
             
             // Log sample of translations received
             if (result && result.length > 0) {
-                console.log(`📝 Sample Translations (first 3):`);
-                result.slice(0, 3).forEach((translation, index) => {
+                console.log(`📝 Sample Translations (first ${LOG_SAMPLE_SIZE}):`);
+                result.slice(0, LOG_SAMPLE_SIZE).forEach((translation, index) => {
                     if (translation && translation.target) {
-                        console.log(`   ${index + 1}. "${translation.target.substring(0, 50)}${translation.target.length > 50 ? '...' : ''}"`);
+                        console.log(`   ${index + 1}. "${translation.target.substring(0, SAMPLE_TEXT_LENGTH)}${translation.target.length > SAMPLE_TEXT_LENGTH ? '...' : ''}"`);
                     }
                 });
             }
@@ -951,7 +1018,7 @@ class TranslationEngine {
         this.currentTargetLanguage = null;
         this.translationInProgress = false;
         this.autoTranslationEnabled = false;
-        this.initializationDelay = 3000;
+        this.initializationDelay = INITIALIZATION_DELAY_MS;
         
         // Translation tracking to prevent duplicate API calls
         this.translatedElements = new WeakSet();
@@ -1202,7 +1269,7 @@ class TranslationEngine {
         // Monitor for page navigation and trigger translation if needed
         let lastUrl = window.location.href;
         
-        // Check for navigation every 2 seconds
+        // Check for navigation at configured interval
         setInterval(() => {
             const currentUrl = window.location.href;
             if (currentUrl !== lastUrl) {
@@ -1216,10 +1283,10 @@ class TranslationEngine {
                     // Delay to allow page to load
                     setTimeout(() => {
                         this.autoTranslatePage(currentLang);
-                    }, 1000);
+                    }, NAVIGATION_TRANSLATION_DELAY_MS);
                 }
             }
-        }, 2000);
+        }, NAVIGATION_CHECK_INTERVAL_MS);
         
         console.log('✅ Navigation monitoring setup complete');
     }
@@ -1251,7 +1318,7 @@ class TranslationEngine {
                                 // Ignore errors like anuvadini does
                             }
                         } else if (addedNode.nodeType === Node.ELEMENT_NODE) {
-                            console.log('🏷️ Element node detected:', addedNode.tagName, addedNode.textContent?.substring(0, 50));
+                            console.log('🏷️ Element node detected:', addedNode.tagName, addedNode.textContent?.substring(0, SAMPLE_TEXT_LENGTH));
                             // Check for current language (like anuvadini does)
                             const currentLang = localStorage.getItem("selectedLanguage");
                             console.log('🌐 Current language from localStorage:', currentLang);
@@ -1260,7 +1327,7 @@ class TranslationEngine {
                             if (currentLang && currentLang !== "en-IN" && currentLang !== "en") {
                                 // Check if this element contains meaningful text that needs translation
                                 const elementText = addedNode.textContent?.trim();
-                                if (elementText && elementText.length > 10) { // Only process elements with substantial text
+                                if (elementText && elementText.length > MEANINGFUL_TEXT_LENGTH) { // Only process elements with substantial text
                                     console.log('🔄 New content detected, translating to:', currentLang);
                                     // Update current target language if it changed
                                     if (this.currentTargetLanguage !== currentLang) {
@@ -1314,7 +1381,7 @@ class TranslationEngine {
     
     async translateNewElement(element) {
         try {
-            console.log('🎯 translateNewElement called for:', element.tagName, element.textContent?.substring(0, 50));
+            console.log('🎯 translateNewElement called for:', element.tagName, element.textContent?.substring(0, SAMPLE_TEXT_LENGTH));
             
             // Get text nodes from the new element
             const textNodes = this.dfsTraversal.getTextNodesToTranslate(element, {
@@ -1333,7 +1400,7 @@ class TranslationEngine {
                 const allTextNodes = this.getTextNodes(element);
                 const meaningfulTextNodes = allTextNodes.filter(node => {
                     const text = node.textContent?.trim();
-                    return text && text.length > 2; // Remove translation state check
+                    return text && text.length > MIN_TEXT_LENGTH; // Remove translation state check
                 });
                 
                 if (meaningfulTextNodes.length > 0) {
@@ -1366,7 +1433,7 @@ class TranslationEngine {
             const text = node.textContent || node.content || '';
             const trimmedText = text.trim();
             // Only include nodes with meaningful content (more than just whitespace/newlines)
-            return trimmedText.length > 0 && trimmedText.length > 2;
+            return trimmedText.length > 0 && trimmedText.length > MIN_TEXT_LENGTH;
         }).map(node => {
             // Ensure all nodes have the proper format for batch processing
             if (node.type && node.node && node.content) {
@@ -1398,7 +1465,7 @@ class TranslationEngine {
         // Set new timer for debounced translation
         this.debounceTimer = setTimeout(() => {
             this.processDebounceQueue();
-        }, 1000); // 1 second debounce delay
+        }, DEBOUNCE_DELAY_MS);
     }
     
     async processDebounceQueue() {
@@ -1409,17 +1476,17 @@ class TranslationEngine {
         const queueSize = this.debounceQueue.length;
         console.log(`⏰ Processing debounce queue with ${queueSize} items`);
         
-        // Only process if we have at least 50 elements OR if it's been a long time
-        if (queueSize >= 50) {
-            console.log(`✅ Queue size (${queueSize}) >= 50, processing immediately`);
+        // Only process if we have enough elements OR if it's been a long time
+        if (queueSize >= DEBOUNCE_QUEUE_THRESHOLD) {
+            console.log(`✅ Queue size (${queueSize}) >= ${DEBOUNCE_QUEUE_THRESHOLD}, processing immediately`);
             await this.processQueuedElements();
         } else {
-            console.log(`⏳ Queue size (${queueSize}) < 50, waiting for more elements...`);
-            // Set a longer timer to process even small batches after 5 seconds
+            console.log(`⏳ Queue size (${queueSize}) < ${DEBOUNCE_QUEUE_THRESHOLD}, waiting for more elements...`);
+            // Set a longer timer to process even small batches after configured time
             this.debounceTimer = setTimeout(() => {
-                console.log(`⏰ 5 seconds elapsed, processing ${this.debounceQueue.length} items anyway`);
+                console.log(`⏰ ${DEBOUNCE_MAX_WAIT_MS/1000} seconds elapsed, processing ${this.debounceQueue.length} items anyway`);
                 this.processQueuedElements();
-            }, 5000);
+            }, DEBOUNCE_MAX_WAIT_MS);
         }
     }
     
@@ -1775,7 +1842,7 @@ class TranslationEngine {
         }
         
         // Check more text nodes for better accuracy
-        const sampleSize = Math.min(10, textNodes.length);
+        const sampleSize = Math.min(CONTENT_ANALYSIS_SAMPLE_SIZE, textNodes.length);
         let nonLatinCount = 0;
         let totalChars = 0;
         let sampleTexts = [];
@@ -1784,19 +1851,19 @@ class TranslationEngine {
         
         for (let i = 0; i < sampleSize; i++) {
             const text = textNodes[i].content.trim();
-            if (text.length > 3) { // Only check meaningful text
+            if (text.length > MIN_TEXT_LENGTH) { // Only check meaningful text
                 totalChars += text.length;
-                sampleTexts.push(text.substring(0, 50));
+                sampleTexts.push(text.substring(0, SAMPLE_TEXT_LENGTH));
                 
                 // Check for Devanagari (Hindi) characters specifically
                 if (/[\u0900-\u097F]/.test(text)) {
                     nonLatinCount++;
-                    console.log(`✅ Found Hindi text: "${text.substring(0, 30)}..."`);
+                    console.log(`✅ Found Hindi text: "${text.substring(0, SAMPLE_TEXT_LENGTH)}..."`);
                 }
                 // Also check for other Indian scripts
                 else if (/[\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F\u0C80-\u0CFF\u0D00-\u0D7F\u0D80-\u0DFF]/.test(text)) {
                     nonLatinCount++;
-                    console.log(`✅ Found Indian script text: "${text.substring(0, 30)}..."`);
+                    console.log(`✅ Found Indian script text: "${text.substring(0, SAMPLE_TEXT_LENGTH)}..."`);
                 }
             }
         }
@@ -1812,12 +1879,12 @@ class TranslationEngine {
         console.log(`   📝 Total characters analyzed: ${totalChars}`);
         console.log(`   🔤 Non-Latin text nodes: ${nonLatinCount}/${sampleSize}`);
         console.log(`   📊 Translation ratio: ${(translatedRatio * 100).toFixed(1)}%`);
-        console.log(`   ✅ Is translated (>50% non-Latin): ${translatedRatio > 0.5}`);
+        console.log(`   ✅ Is translated (>${(TRANSLATION_RATIO_THRESHOLD * 100)}% non-Latin): ${translatedRatio > TRANSLATION_RATIO_THRESHOLD}`);
         
         console.log(`🔍 ===== PAGE CONTENT ANALYSIS COMPLETE =====\n`);
         
-        // If more than 50% of sampled text contains non-Latin characters, likely translated
-        return translatedRatio > 0.5;
+        // If more than configured threshold of sampled text contains non-Latin characters, likely translated
+        return translatedRatio > TRANSLATION_RATIO_THRESHOLD;
     }
     
     detectCurrentPageLanguage() {
@@ -1839,8 +1906,8 @@ class TranslationEngine {
         }
         
         // Sample text for language detection
-        const sampleText = textNodes.slice(0, 5).map(node => node.content).join(' ');
-        console.log(`📝 Sample text for detection: "${sampleText.substring(0, 100)}..."`);
+        const sampleText = textNodes.slice(0, LANGUAGE_DETECTION_SAMPLE_SIZE).map(node => node.content).join(' ');
+        console.log(`📝 Sample text for detection: "${sampleText.substring(0, SAMPLE_TEXT_LENGTH * 2)}..."`);
         
         // Check for specific language character ranges
         if (/[\u0900-\u097F]/.test(sampleText)) {
@@ -2272,11 +2339,11 @@ class OverlayComponent {
         style.textContent = `
             .enhanced-bhashini-overlay {
                 position: fixed;
-                top: 20px;
-                right: 20px;
-                width: 350px;
+                top: ${OVERLAY_POSITION_TOP}px;
+                right: ${OVERLAY_POSITION_RIGHT}px;
+                width: ${OVERLAY_WIDTH}px;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                border-radius: 12px;
+                border-radius: ${OVERLAY_BORDER_RADIUS}px;
                 box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
                 z-index: 10000;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -2293,11 +2360,11 @@ class OverlayComponent {
             
             .overlay-toggle {
                 position: fixed;
-                top: 20px;
-                right: 20px;
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
+                top: ${OVERLAY_POSITION_TOP}px;
+                right: ${OVERLAY_POSITION_RIGHT}px;
+                width: ${OVERLAY_TOGGLE_SIZE}px;
+                height: ${OVERLAY_TOGGLE_SIZE}px;
+                border-radius: ${OVERLAY_TOGGLE_BORDER_RADIUS}%;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 border: none;
                 color: white;
@@ -2581,7 +2648,7 @@ setTimeout(() => {
     } else {
         console.log('ℹ️ No saved language found, mutation observer will be ready for future language selection');
     }
-}, 3000);
+}, INITIALIZATION_DELAY_MS);
 
 // Auto-initialize when DOM is ready (following anuvadini pattern)
 document.addEventListener("DOMContentLoaded", () => {
@@ -2589,5 +2656,5 @@ document.addEventListener("DOMContentLoaded", () => {
     // Only observe initial content here - auto-translation is handled by global setTimeout
     setTimeout(() => {
         translationEngine.observeInitialContent();
-    }, 5000);
+    }, DOM_CONTENT_DELAY_MS);
 });
